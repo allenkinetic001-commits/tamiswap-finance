@@ -1,0 +1,6 @@
+{
+  "name": "THENA Contracts Studio",
+  "description": "Interactive Solidity contract explorer, ve(3,3) governance simulator, AMM invariant workbench, and live BNB Chain inspector for THENA-Contracts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
