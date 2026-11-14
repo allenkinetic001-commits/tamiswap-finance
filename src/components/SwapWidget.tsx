@@ -405,36 +405,53 @@ export function SwapWidget({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-      className="armor-chassis-shell w-full max-w-[480px]"
+      className="armor-chassis-shell relative w-full max-w-[500px]"
     >
+      {/* Top & bottom central electric-blue flare seams matching armored bezel */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-1 left-1/2 z-20 h-2 w-40 -translate-x-1/2 rounded-full bg-cyan-300/75 blur-md"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -bottom-1 left-1/2 z-20 h-2 w-36 -translate-x-1/2 rounded-full bg-sky-400/65 blur-md"
+      />
+
       <div className="armor-chassis-rim">
         <div className="armor-chassis relative overflow-hidden p-5 sm:p-6">
-          {/* Top electric-blue energy vein conduit */}
+          {/* Top & bottom illuminated horizontal plasma seams */}
           <div
             aria-hidden="true"
-            className="energy-vein-beam pointer-events-none absolute top-0 right-6 left-6 h-[2px] bg-gradient-to-r from-transparent via-cyan-300 to-transparent"
+            className="energy-vein-beam pointer-events-none absolute top-0 right-6 left-6 h-[2px] bg-gradient-to-r from-transparent via-cyan-200 to-transparent"
           />
-          {/* Subtle armor corner seam accents */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute right-8 bottom-0 left-8 h-[1.5px] bg-gradient-to-r from-transparent via-sky-300 to-transparent"
+          />
+
+          {/* Side & corner armor clamp notches */}
           <svg
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 h-full w-full opacity-55"
+            className="pointer-events-none absolute inset-0 h-full w-full opacity-75"
             preserveAspectRatio="none"
-            viewBox="0 0 480 620"
+            viewBox="0 0 500 620"
             fill="none"
           >
-            <path d="M22 10 H96 L112 20" stroke="#38bdf8" strokeWidth="1" strokeOpacity="0.45" />
-            <path d="M458 10 H384 L368 20" stroke="#38bdf8" strokeWidth="1" strokeOpacity="0.45" />
-            <path d="M22 610 H96 L112 600" stroke="#00e5ff" strokeWidth="1" strokeOpacity="0.4" />
-            <path d="M458 610 H384 L368 600" stroke="#00e5ff" strokeWidth="1" strokeOpacity="0.4" />
+            <path d="M24 8 H115 L130 17" stroke="#7dd3fc" strokeWidth="1.2" strokeOpacity="0.6" />
+            <path d="M476 8 H385 L370 17" stroke="#7dd3fc" strokeWidth="1.2" strokeOpacity="0.6" />
+            <path d="M8 140 L16 156 V270 L8 286" stroke="#38bdf8" strokeWidth="1.4" strokeOpacity="0.55" />
+            <path d="M492 140 L484 156 V270 L492 286" stroke="#38bdf8" strokeWidth="1.4" strokeOpacity="0.55" />
+            <path d="M24 612 H115 L130 603" stroke="#38bdf8" strokeWidth="1.2" strokeOpacity="0.55" />
+            <path d="M476 612 H385 L370 603" stroke="#38bdf8" strokeWidth="1.2" strokeOpacity="0.55" />
           </svg>
 
           {/* Card Header */}
-          <div className="relative z-10 mb-5 flex items-center justify-between border-b border-sky-400/20 pb-4">
+          <div className="relative z-10 mb-5 flex items-start justify-between">
             <div>
-              <h1 className="font-display chrome-text text-xl font-extrabold tracking-widest uppercase">
+              <h1 className="font-display chrome-text text-2xl font-extrabold tracking-widest uppercase">
                 Swap
               </h1>
-              <p className="mt-0.5 font-mono text-[11px] text-sky-300/80">
+              <p className="mt-1 font-mono text-xs font-medium text-sky-400">
                 THENA RouterV2 · {THENA_ROUTER_V2_ADDRESS.slice(0, 6)}...
                 {THENA_ROUTER_V2_ADDRESS.slice(-4)}
               </p>
@@ -447,7 +464,7 @@ export function SwapWidget({
                   onClick={refreshBalances}
                   disabled={loadingBalances}
                   title="Refresh on-chain balances"
-                  className="combat-steel-btn p-2 text-slate-300 hover:text-cyan-300 disabled:opacity-50"
+                  className="combat-steel-btn p-2.5 text-slate-200 hover:text-cyan-300 disabled:opacity-50"
                 >
                   <RefreshCw
                     className={`h-4 w-4 ${loadingBalances ? 'animate-spin text-cyan-300' : ''}`}
@@ -458,10 +475,10 @@ export function SwapWidget({
                 type="button"
                 onClick={() => setShowSettings((s) => !s)}
                 title="Swap settings"
-                className={`combat-steel-btn p-2 ${
+                className={`combat-steel-btn p-2.5 ${
                   showSettings
-                    ? 'border-cyan-400 text-cyan-300 shadow-[0_0_16px_rgba(0,229,255,0.34)]'
-                    : 'text-slate-300 hover:text-cyan-200'
+                    ? 'border-cyan-300 text-cyan-200 shadow-[0_0_18px_rgba(0,200,255,0.45)]'
+                    : 'text-slate-200 hover:text-cyan-200'
                 }`}
               >
                 <Settings className="h-4 w-4" />
@@ -497,8 +514,8 @@ export function SwapWidget({
                           onClick={() => setSlippagePct(val)}
                           className={`flex-1 py-1.5 font-mono text-xs font-semibold transition-all ${
                             slippagePct === val
-                              ? 'combat-steel-btn border-cyan-400 text-cyan-200 shadow-[0_0_12px_rgba(0,229,255,0.28)]'
-                              : 'border border-slate-800 bg-[#0b1324] text-slate-400 hover:border-sky-500/40 hover:text-slate-200'
+                              ? 'combat-energy-btn text-white'
+                              : 'border border-sky-500/25 bg-[#071124] text-slate-300 hover:border-sky-400/55 hover:text-white'
                           }`}
                         >
                           {val}%
@@ -515,7 +532,7 @@ export function SwapWidget({
                             Math.max(0.05, Math.min(49, Number(e.target.value) || 0.5))
                           )
                         }
-                        className="w-20 border border-sky-500/30 bg-[#030712] px-2 py-1.5 text-right font-mono text-xs text-cyan-100 tabular-nums focus:border-cyan-400 focus:outline-none"
+                        className="w-20 border border-sky-400/40 bg-[#030712] px-2 py-1.5 text-right font-mono text-xs text-cyan-100 tabular-nums focus:border-cyan-300 focus:outline-none"
                       />
                     </div>
                   </div>
@@ -535,7 +552,7 @@ export function SwapWidget({
                             Math.max(1, Math.min(120, Number(e.target.value) || 20))
                           )
                         }
-                        className="w-14 border border-sky-500/30 bg-[#030712] px-2 py-1 text-right font-mono text-xs text-cyan-100 tabular-nums focus:border-cyan-400 focus:outline-none"
+                        className="w-14 border border-sky-400/40 bg-[#030712] px-2 py-1 text-right font-mono text-xs text-cyan-100 tabular-nums focus:border-cyan-300 focus:outline-none"
                       />
                       <span className="text-slate-400">min</span>
                     </div>
@@ -545,9 +562,9 @@ export function SwapWidget({
             )}
           </AnimatePresence>
 
-          {/* Pool Mode Selector */}
-          <div className="armor-well-rim relative z-10 mb-3.5">
-            <div className="armor-well flex items-center gap-1 p-1 text-xs">
+          {/* Pool Mode Selector Rail */}
+          <div className="armor-well-rim relative z-10 mb-4">
+            <div className="armor-well flex items-center gap-1.5 p-1.5 text-xs">
               {(
                 [
                   { id: 'auto', label: 'Auto Route' },
@@ -559,10 +576,10 @@ export function SwapWidget({
                   key={opt.id}
                   type="button"
                   onClick={() => setRouteMode(opt.id)}
-                  className={`flex-1 px-2 py-1.5 font-semibold tracking-wide whitespace-nowrap transition-all ${
+                  className={`flex-1 px-2.5 py-2 font-semibold tracking-wide whitespace-nowrap transition-all ${
                     routeMode === opt.id
-                      ? 'combat-steel-btn border-cyan-400/80 text-cyan-200 shadow-[0_0_14px_rgba(0,229,255,0.28)]'
-                      : 'border border-transparent text-slate-400 hover:text-slate-200'
+                      ? 'combat-energy-btn text-white drop-shadow-[0_1px_2px_rgba(2,6,23,0.9)]'
+                      : 'border border-transparent text-slate-300 hover:border-sky-500/35 hover:text-white'
                   }`}
                 >
                   {opt.label}
@@ -573,13 +590,13 @@ export function SwapWidget({
 
           {/* You Pay Chamber */}
           <div className="armor-well-rim relative z-10">
-            <div className="armor-well p-4">
-              <div className="mb-2.5 flex items-center justify-between text-xs">
-                <span className="font-display text-[11px] font-bold tracking-widest text-sky-300/90 uppercase">
+            <div className="armor-well p-4 sm:p-5">
+              <div className="mb-3 flex items-center justify-between text-xs">
+                <span className="font-display text-[11px] font-bold tracking-widest text-slate-200 uppercase">
                   You pay
                 </span>
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-slate-400 tabular-nums">
+                  <span className="font-mono text-slate-300 tabular-nums">
                     {walletAddress
                       ? `Bal: ${formatDisplayAmount(balanceInStr)}`
                       : 'Wallet not connected'}
@@ -596,7 +613,7 @@ export function SwapWidget({
                       <button
                         type="button"
                         onClick={() => handleFillFraction(1, 1)}
-                        className="font-mono text-[11px] font-bold text-cyan-300 transition-colors hover:text-white"
+                        className="font-mono text-[11px] font-bold text-sky-300 transition-colors hover:text-white"
                       >
                         MAX
                       </button>
@@ -618,28 +635,28 @@ export function SwapWidget({
                     setTxStatusText(null);
                   }}
                   placeholder="0.0"
-                  className="min-w-0 flex-1 bg-transparent font-mono text-2xl font-bold text-white placeholder-slate-600 tabular-nums focus:outline-none"
+                  className="min-w-0 flex-1 bg-transparent font-mono text-2xl sm:text-[28px] font-bold text-white placeholder-slate-600 tabular-nums focus:outline-none"
                 />
                 <button
                   type="button"
                   onClick={() => setSelectorSide('in')}
-                  className="combat-steel-btn inline-flex shrink-0 items-center gap-2 px-3 py-2 text-sm font-bold tracking-wider text-slate-50 whitespace-nowrap"
+                  className="combat-steel-btn inline-flex shrink-0 items-center gap-2.5 px-3.5 py-2 text-sm font-bold tracking-wider text-white whitespace-nowrap"
                 >
                   <TokenLogo token={tokenIn} size={22} />
-                  <span className="chrome-text font-display text-xs font-bold tracking-wider">
+                  <span className="font-sans text-sm font-bold tracking-wide text-white">
                     {tokenIn.symbol}
                   </span>
-                  <ChevronDown className="h-4 w-4 text-cyan-300" />
+                  <ChevronDown className="h-4 w-4 text-sky-300" />
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Illuminated Flip Conduit */}
-          <div className="relative z-20 -my-3.5 flex items-center justify-center">
+          {/* Illuminated Hexagonal Flip Conduit */}
+          <div className="relative z-20 -my-4 flex items-center justify-center">
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute right-10 left-10 h-[1px] bg-gradient-to-r from-transparent via-sky-500/55 to-transparent"
+              className="pointer-events-none absolute right-10 left-10 h-[2px] bg-gradient-to-r from-transparent via-sky-400 to-transparent shadow-[0_0_10px_rgba(56,189,248,0.8)]"
             />
             <motion.button
               type="button"
@@ -647,7 +664,7 @@ export function SwapWidget({
               animate={{ rotate: flipCount * 180 }}
               transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
               aria-label="Flip swap direction"
-              className="combat-steel-btn relative flex h-10 w-10 items-center justify-center text-cyan-300 shadow-[0_0_18px_rgba(0,174,255,0.28)] hover:text-white"
+              className="combat-hex-core relative flex h-11 w-12 items-center justify-center text-cyan-200 hover:text-white"
             >
               <ArrowUpDown className="h-4 w-4" />
             </motion.button>
@@ -655,25 +672,25 @@ export function SwapWidget({
 
           {/* You Receive Chamber */}
           <div className="armor-well-rim relative z-10">
-            <div className="armor-well p-4">
-              <div className="mb-2.5 flex items-center justify-between text-xs">
-                <span className="font-display text-[11px] font-bold tracking-widest text-sky-300/90 uppercase">
+            <div className="armor-well p-4 sm:p-5">
+              <div className="mb-3 flex items-center justify-between text-xs">
+                <span className="font-display text-[11px] font-bold tracking-widest text-slate-200 uppercase">
                   You receive
                 </span>
-                <span className="font-mono text-slate-400 tabular-nums">
+                <span className="font-mono text-slate-300 tabular-nums">
                   {walletAddress ? `Bal: ${formatDisplayAmount(balanceOutStr)}` : ''}
                 </span>
               </div>
 
               <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0 flex-1 truncate font-mono text-2xl font-bold text-white tabular-nums">
+                <div className="min-w-0 flex-1 truncate font-mono text-2xl sm:text-[28px] font-bold text-white tabular-nums">
                   {quoting && amountInWei > 0n ? (
                     <span className="inline-flex items-center gap-2 text-base font-medium text-cyan-300">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       <span>Quoting BSC...</span>
                     </span>
                   ) : quote ? (
-                    <span className="text-cyan-50 drop-shadow-[0_0_12px_rgba(0,204,255,0.35)]">
+                    <span className="text-white drop-shadow-[0_0_10px_rgba(56,189,248,0.3)]">
                       {formatDisplayAmount(quote.amountOutFormatted)}
                     </span>
                   ) : (
@@ -684,13 +701,13 @@ export function SwapWidget({
                 <button
                   type="button"
                   onClick={() => setSelectorSide('out')}
-                  className="combat-steel-btn inline-flex shrink-0 items-center gap-2 px-3 py-2 text-sm font-bold tracking-wider text-slate-50 whitespace-nowrap"
+                  className="combat-steel-btn inline-flex shrink-0 items-center gap-2.5 px-3.5 py-2 text-sm font-bold tracking-wider text-white whitespace-nowrap"
                 >
                   <TokenLogo token={tokenOut} size={22} />
-                  <span className="chrome-text font-display text-xs font-bold tracking-wider">
+                  <span className="font-sans text-sm font-bold tracking-wide text-white">
                     {tokenOut.symbol}
                   </span>
-                  <ChevronDown className="h-4 w-4 text-cyan-300" />
+                  <ChevronDown className="h-4 w-4 text-sky-300" />
                 </button>
               </div>
             </div>

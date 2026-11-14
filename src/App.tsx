@@ -211,60 +211,120 @@ export default function App() {
 
   return (
     <div className="combat-tech-backdrop relative flex min-h-screen flex-col overflow-x-hidden text-slate-100">
-      {/* Subtle Cybernetic Circuitry Vein Backdrop & Volumetric Cobalt Core Lighting */}
+      {/* Symmetrical Cybernetic Armor Cockpit Backdrop & Electric-Blue Plasma Seams */}
       <div
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 overflow-hidden"
       >
         <svg
-          className="absolute inset-0 h-full w-full opacity-[0.14]"
+          className="absolute inset-0 h-full w-full"
           xmlns="http://www.w3.org/2000/svg"
           preserveAspectRatio="none"
           viewBox="0 0 1440 900"
+          fill="none"
         >
           <defs>
-            <linearGradient id="vein-h" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#0066ff" stopOpacity="0" />
-              <stop offset="35%" stopColor="#00aaff" stopOpacity="0.85" />
-              <stop offset="50%" stopColor="#38bdf8" stopOpacity="1" />
-              <stop offset="65%" stopColor="#00aaff" stopOpacity="0.85" />
-              <stop offset="100%" stopColor="#0066ff" stopOpacity="0" />
+            <linearGradient id="steel-wing-l" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#1e293b" stopOpacity="0.95" />
+              <stop offset="55%" stopColor="#0f172a" stopOpacity="0.92" />
+              <stop offset="100%" stopColor="#334155" stopOpacity="0.88" />
+            </linearGradient>
+            <linearGradient id="steel-wing-r" x1="100%" y1="0%" x2="0%" y2="0%">
+              <stop offset="0%" stopColor="#1e293b" stopOpacity="0.95" />
+              <stop offset="55%" stopColor="#0f172a" stopOpacity="0.92" />
+              <stop offset="100%" stopColor="#334155" stopOpacity="0.88" />
+            </linearGradient>
+            <linearGradient id="plasma-beam" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#0066ff" stopOpacity="0.2" />
+              <stop offset="50%" stopColor="#38bdf8" stopOpacity="0.95" />
+              <stop offset="100%" stopColor="#bae6fd" stopOpacity="0.95" />
             </linearGradient>
           </defs>
-          {/* Symmetrical angular cybernetic armor trace lines */}
+
+          {/* Left side 3D armored wing plate & bottom corner armor */}
           <path
-            d="M0 240 L260 240 L320 300 L520 300 M1440 240 L1180 240 L1120 300 L920 300"
-            stroke="url(#vein-h)"
-            strokeWidth="1.25"
-            fill="none"
+            d="M0 160 L82 230 L82 540 L150 640 L150 900 L0 900 Z"
+            fill="url(#steel-wing-l)"
+            opacity="0.82"
           />
           <path
-            d="M0 640 L220 640 L290 570 L490 570 M1440 640 L1220 640 L1150 570 L950 570"
-            stroke="url(#vein-h)"
-            strokeWidth="1.25"
-            fill="none"
+            d="M0 160 L82 230 L82 540 L150 640 L150 900"
+            stroke="#38bdf8"
+            strokeWidth="2"
+            strokeOpacity="0.72"
           />
-          <circle cx="520" cy="300" r="3" fill="#38bdf8" />
-          <circle cx="920" cy="300" r="3" fill="#38bdf8" />
-          <circle cx="490" cy="570" r="3" fill="#00e5ff" />
-          <circle cx="950" cy="570" r="3" fill="#00e5ff" />
+          <path
+            d="M0 430 L178 605 L295 815 L370 900"
+            stroke="url(#plasma-beam)"
+            strokeWidth="2.4"
+          />
+          <path
+            d="M82 320 L185 388 L260 398"
+            stroke="#0ea5e9"
+            strokeWidth="1.2"
+            strokeOpacity="0.55"
+          />
+          <path
+            d="M0 805 L210 805 L295 865 L340 900 L0 900 Z"
+            fill="#0a162d"
+            fillOpacity="0.92"
+            stroke="#38bdf8"
+            strokeWidth="1.8"
+            strokeOpacity="0.75"
+          />
+
+          {/* Right side 3D armored wing plate & bottom corner armor */}
+          <path
+            d="M1440 160 L1358 230 L1358 540 L1290 640 L1290 900 L1440 900 Z"
+            fill="url(#steel-wing-r)"
+            opacity="0.82"
+          />
+          <path
+            d="M1440 160 L1358 230 L1358 540 L1290 640 L1290 900"
+            stroke="#38bdf8"
+            strokeWidth="2"
+            strokeOpacity="0.72"
+          />
+          <path
+            d="M1440 430 L1262 605 L1145 815 L1070 900"
+            stroke="url(#plasma-beam)"
+            strokeWidth="2.4"
+          />
+          <path
+            d="M1358 320 L1255 388 L1180 398"
+            stroke="#0ea5e9"
+            strokeWidth="1.2"
+            strokeOpacity="0.55"
+          />
+          <path
+            d="M1440 805 L1230 805 L1145 865 L1100 900 L1440 900 Z"
+            fill="#0a162d"
+            fillOpacity="0.92"
+            stroke="#38bdf8"
+            strokeWidth="1.8"
+            strokeOpacity="0.75"
+          />
         </svg>
-        <div className="energy-vein-glow absolute top-1/4 left-1/2 h-[460px] w-[660px] -translate-x-1/2 rounded-full bg-sky-500/14 blur-[135px]" />
-        <div className="absolute bottom-0 left-1/2 h-[320px] w-[540px] -translate-x-1/2 rounded-full bg-blue-700/16 blur-[125px]" />
+
+        <div className="energy-vein-glow absolute top-1/4 left-1/2 h-[480px] w-[680px] -translate-x-1/2 rounded-full bg-sky-500/18 blur-[135px]" />
+        <div className="absolute bottom-0 left-1/2 h-[320px] w-[540px] -translate-x-1/2 rounded-full bg-blue-700/18 blur-[125px]" />
       </div>
 
-      {/* Armored Top Navigation Bar */}
-      <header className="combat-topbar relative z-20 flex h-16 items-center justify-between gap-8 px-6">
+      {/* Stepped Armored Top Navigation Bar */}
+      <header className="combat-topbar relative z-20 flex h-16 items-center justify-between gap-8 px-4 sm:px-6">
         <div
           aria-hidden="true"
-          className="energy-vein-beam pointer-events-none absolute right-0 bottom-0 left-0 h-[1.5px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent"
+          className="energy-vein-beam pointer-events-none absolute right-0 bottom-0 left-0 h-[2px] bg-gradient-to-r from-sky-500/40 via-cyan-300 to-sky-500/40"
         />
         <div className="flex items-center gap-3 whitespace-nowrap shrink-0">
-          <div className="chrome-armor-plate flex h-9 w-9 items-center justify-center font-display text-xs font-extrabold tracking-wider text-slate-950">
+          <div className="combat-hex-core flex h-9 w-10 items-center justify-center font-display text-xs font-extrabold tracking-wider text-white">
             TH
           </div>
-          <span className="font-display chrome-text text-base font-bold tracking-widest uppercase">
-            THENA Swap
+          <span className="font-display text-base font-extrabold tracking-widest uppercase whitespace-nowrap shrink-0">
+            <span className="text-white">THENA </span>
+            <span className="text-sky-400 drop-shadow-[0_0_10px_rgba(56,189,248,0.65)]">
+              SWAP
+            </span>
           </span>
         </div>
 
@@ -278,7 +338,7 @@ export default function App() {
                 ? () => setShowWalletModal(true)
                 : handleConnectButton
             }
-            className="combat-steel-btn px-4 py-2 font-mono text-xs font-semibold tracking-wider text-cyan-100 whitespace-nowrap shrink-0"
+            className="combat-steel-btn px-5 py-2 font-sans text-xs font-bold tracking-wider text-white whitespace-nowrap shrink-0"
           >
             {wrongNetwork
               ? 'Switch to BSC (56)'
@@ -289,12 +349,12 @@ export default function App() {
         </div>
       </header>
 
-      <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 py-10">
+      <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 py-8 sm:py-10">
         {walletNotice && (
           <motion.div
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
-            className="armor-chassis-shell mb-4 w-full max-w-[480px]"
+            className="armor-chassis-shell mb-4 w-full max-w-[500px]"
           >
             <div className="armor-well-rim">
               <div className="armor-well px-4 py-2.5 text-center text-xs text-cyan-100">
