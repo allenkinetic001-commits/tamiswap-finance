@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ethers } from 'ethers';
 import { AnimatePresence, motion } from 'motion/react';
-import { ExternalLink, X } from 'lucide-react';
+import { ExternalLink, Wallet, X } from 'lucide-react';
 import { SwapWidget } from './components/SwapWidget';
 import { BSC_CHAIN_ID } from './data/swapTokens';
 import { ensureBscNetwork } from './utils/bscWeb3';
@@ -434,23 +434,28 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
-          <button
-            type="button"
-            onClick={
-              wrongNetwork
-                ? handleSwitchToBsc
-                : walletAddress
-                ? () => setShowWalletModal(true)
-                : handleConnectButton
-            }
-            className="combat-steel-btn px-5 py-2 font-sans text-xs font-bold tracking-wider text-white whitespace-nowrap shrink-0"
-          >
-            {wrongNetwork
-              ? 'Switch to BSC (56)'
-              : walletAddress
-              ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
-              : 'Connect Wallet'}
-          </button>
+          <div className="wallet-cyber-rim">
+            <button
+              type="button"
+              onClick={
+                wrongNetwork
+                  ? handleSwitchToBsc
+                  : walletAddress
+                  ? () => setShowWalletModal(true)
+                  : handleConnectButton
+              }
+              className="wallet-cyber-btn inline-flex items-center gap-2 px-4 py-2 font-display text-xs font-bold tracking-wider text-white uppercase whitespace-nowrap shrink-0"
+            >
+              <Wallet className="h-3.5 w-3.5 text-cyan-300 drop-shadow-[0_0_6px_rgba(0,212,255,0.9)]" />
+              <span className="chrome-text">
+                {wrongNetwork
+                  ? 'Switch to BSC (56)'
+                  : walletAddress
+                  ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
+                  : 'Connect Wallet'}
+              </span>
+            </button>
+          </div>
         </div>
       </header>
 

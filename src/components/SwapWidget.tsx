@@ -9,6 +9,7 @@ import {
   Plus,
   RefreshCw,
   Settings,
+  Wallet,
   X,
 } from 'lucide-react';
 import {
@@ -806,9 +807,10 @@ export function SwapWidget({
             <button
               type="button"
               onClick={onConnectWallet}
-              className="combat-energy-btn font-display relative z-10 mt-5 flex w-full items-center justify-center px-4 py-3.5 text-xs font-extrabold tracking-widest text-white uppercase drop-shadow-[0_1px_2px_rgba(2,6,23,0.9)]"
+              className="combat-energy-btn font-display relative z-10 mt-5 flex w-full items-center justify-center gap-2.5 px-4 py-3.5 text-xs font-extrabold tracking-widest text-white uppercase drop-shadow-[0_1px_2px_rgba(2,6,23,0.9)]"
             >
-              Connect Trust Wallet / Web3
+              <Wallet className="h-4 w-4 text-cyan-100 drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
+              <span>Connect Trust Wallet / Web3</span>
             </button>
           ) : wrongNetwork ? (
             <button

@@ -277,6 +277,108 @@
   box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.08);
 }
 
+/* Cooler Double-Beveled Cybernetic Connect Wallet Button */
+.wallet-cyber-rim {
+  position: relative;
+  display: inline-flex;
+  padding: 1.5px;
+  clip-path: polygon(
+    12px 0,
+    calc(100% - 12px) 0,
+    100% 12px,
+    100% calc(100% - 12px),
+    calc(100% - 12px) 100%,
+    12px 100%,
+    0 calc(100% - 12px),
+    0 12px
+  );
+  background: linear-gradient(
+    120deg,
+    #cff4ff 0%,
+    #00b8ff 28%,
+    #0044cc 52%,
+    #00e5ff 78%,
+    #e0f7ff 100%
+  );
+  filter:
+    drop-shadow(0 0 12px rgba(0, 180, 255, 0.65))
+    drop-shadow(0 4px 10px rgba(0, 0, 0, 0.85));
+  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), filter 180ms ease;
+}
+
+.wallet-cyber-rim:hover {
+  filter:
+    drop-shadow(0 0 18px rgba(0, 215, 255, 0.92))
+    drop-shadow(0 6px 14px rgba(0, 0, 0, 0.9));
+  transform: translateY(-1px);
+}
+
+.wallet-cyber-rim:active {
+  transform: translateY(1px);
+}
+
+.wallet-cyber-btn {
+  position: relative;
+  overflow: hidden;
+  clip-path: polygon(
+    11px 0,
+    calc(100% - 11px) 0,
+    100% 11px,
+    100% calc(100% - 11px),
+    calc(100% - 11px) 100%,
+    11px 100%,
+    0 calc(100% - 11px),
+    0 11px
+  );
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.025) 0px,
+      rgba(255, 255, 255, 0.025) 1px,
+      transparent 1px,
+      transparent 4px
+    ),
+    linear-gradient(
+      180deg,
+      #12356b 0%,
+      #071b3d 48%,
+      #030d21 100%
+    );
+  box-shadow:
+    inset 0 1px 1px rgba(205, 244, 255, 0.55),
+    inset 0 -2px 5px rgba(0, 0, 0, 0.85);
+}
+
+.wallet-cyber-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 54% 0;
+  background: linear-gradient(180deg, rgba(165, 232, 255, 0.24) 0%, rgba(255, 255, 255, 0) 100%);
+  pointer-events: none;
+}
+
+.wallet-cyber-btn::after {
+  content: '';
+  position: absolute;
+  top: -20%;
+  left: -60%;
+  width: 45%;
+  height: 140%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(165, 243, 252, 0.38) 50%,
+    transparent 100%
+  );
+  transform: skewX(-24deg);
+  transition: transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+.wallet-cyber-rim:hover .wallet-cyber-btn::after {
+  transform: translateX(360%) skewX(-24deg);
+}
+
 @keyframes vein-surge {
   0% {
     opacity: 0.45;
@@ -331,7 +433,9 @@
   .combat-steel-btn,
   .combat-energy-btn,
   .combat-hex-core,
-  .armor-well-rim {
+  .armor-well-rim,
+  .wallet-cyber-rim,
+  .wallet-cyber-btn::after {
     transition: none;
   }
 }
