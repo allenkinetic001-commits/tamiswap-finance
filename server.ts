@@ -464,7 +464,7 @@ async function startServer() {
     app.use(vite.middlewares);
   }
 
-  const PORT = Number(process.env.PORT) || 3000;
+  const PORT = Number(process.env.DEFAULT_APP_PORT) || 3000;
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`THENA Contracts Studio running on http://0.0.0.0:${PORT}`);
   });

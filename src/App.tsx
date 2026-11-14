@@ -47,6 +47,15 @@ export default function App() {
   const [chainId, setChainId] = useState<number | null>(null);
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [walletNotice, setWalletNotice] = useState<string | null>(null);
+  const [isRedMode, setIsRedMode] = useState<boolean>(false);
+
+  useEffect(() => {
+    try {
+      window.localStorage.removeItem('tamiswap_red_mode');
+    } catch {
+      // ignore storage errors
+    }
+  }, []);
 
   // Discover EIP-6963 wallets asynchronously + window.trustwallet / window.ethereum
   useEffect(() => {
@@ -209,9 +218,49 @@ export default function App() {
         )}`
       : '#';
 
+  const svgColors = isRedMode
+    ? {
+        wingTop: '#380f18',
+        wingMid: '#24090f',
+        wingBot: '#5f1e2c',
+        plasma0: '#cc0022',
+        plasma1: '#ff223a',
+        plasma2: '#ffd6dc',
+        cornerFill: '#2c0710',
+        border: '#ff223a',
+        veinMain: '#ff1e38',
+        veinCore: '#ffb3be',
+        veinBranch: '#ff3b52',
+        veinMid: '#ff2a42',
+        veinBright: '#ff4d63',
+        nodeLight: '#ff99a8',
+        nodeBright: '#ff3b52',
+      }
+    : {
+        wingTop: '#0f1e38',
+        wingMid: '#091224',
+        wingBot: '#1e3a5f',
+        plasma0: '#0055ff',
+        plasma1: '#00b8ff',
+        plasma2: '#cff4ff',
+        cornerFill: '#07132c',
+        border: '#00c8ff',
+        veinMain: '#009dff',
+        veinCore: '#aef0ff',
+        veinBranch: '#00d4ff',
+        veinMid: '#00b4ff',
+        veinBright: '#00e5ff',
+        nodeLight: '#7ce7ff',
+        nodeBright: '#00d4ff',
+      };
+
   return (
-    <div className="combat-tech-backdrop relative flex min-h-screen flex-col overflow-x-hidden text-slate-100">
-      {/* Symmetrical Cybernetic Armor Cockpit & Glowing Neon-Blue Vein Network */}
+    <div
+      className={`combat-tech-backdrop relative flex min-h-screen flex-col overflow-x-hidden text-slate-100 ${
+        isRedMode ? 'theme-red' : ''
+      }`}
+    >
+      {/* Symmetrical Cybernetic Armor Cockpit & Glowing Neon Vein Network */}
       <div
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 overflow-hidden"
@@ -232,19 +281,19 @@ export default function App() {
               </feMerge>
             </filter>
             <linearGradient id="steel-wing-l" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#0f1e38" stopOpacity="0.96" />
-              <stop offset="55%" stopColor="#091224" stopOpacity="0.94" />
-              <stop offset="100%" stopColor="#1e3a5f" stopOpacity="0.9" />
+              <stop offset="0%" stopColor={svgColors.wingTop} stopOpacity="0.96" />
+              <stop offset="55%" stopColor={svgColors.wingMid} stopOpacity="0.94" />
+              <stop offset="100%" stopColor={svgColors.wingBot} stopOpacity="0.9" />
             </linearGradient>
             <linearGradient id="steel-wing-r" x1="100%" y1="0%" x2="0%" y2="0%">
-              <stop offset="0%" stopColor="#0f1e38" stopOpacity="0.96" />
-              <stop offset="55%" stopColor="#091224" stopOpacity="0.94" />
-              <stop offset="100%" stopColor="#1e3a5f" stopOpacity="0.9" />
+              <stop offset="0%" stopColor={svgColors.wingTop} stopOpacity="0.96" />
+              <stop offset="55%" stopColor={svgColors.wingMid} stopOpacity="0.94" />
+              <stop offset="100%" stopColor={svgColors.wingBot} stopOpacity="0.9" />
             </linearGradient>
             <linearGradient id="plasma-beam" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#0055ff" stopOpacity="0.35" />
-              <stop offset="50%" stopColor="#00b8ff" stopOpacity="1" />
-              <stop offset="100%" stopColor="#cff4ff" stopOpacity="1" />
+              <stop offset="0%" stopColor={svgColors.plasma0} stopOpacity="0.35" />
+              <stop offset="50%" stopColor={svgColors.plasma1} stopOpacity="1" />
+              <stop offset="100%" stopColor={svgColors.plasma2} stopOpacity="1" />
             </linearGradient>
           </defs>
 
@@ -256,7 +305,7 @@ export default function App() {
           />
           <path
             d="M0 160 L82 230 L82 540 L150 640 L150 900"
-            stroke="#00c8ff"
+            stroke={svgColors.border}
             strokeWidth="2.4"
             filter="url(#neon-blue-vein)"
           />
@@ -268,65 +317,65 @@ export default function App() {
           />
           <path
             d="M0 805 L210 805 L295 865 L340 900 L0 900 Z"
-            fill="#07132c"
+            fill={svgColors.cornerFill}
             fillOpacity="0.94"
-            stroke="#00b8ff"
+            stroke={svgColors.plasma1}
             strokeWidth="2"
             filter="url(#neon-blue-vein)"
           />
 
-          {/* Left Cybernetic Blue Veins (branching energy arteries & capillary conduits) */}
+          {/* Left Cybernetic Veins (branching energy arteries & capillary conduits) */}
           <g filter="url(#neon-blue-vein)">
             <path
               d="M0 245 L110 245 L165 298 L290 298 L345 345 L465 345"
-              stroke="#009dff"
+              stroke={svgColors.veinMain}
               strokeWidth="2.2"
             />
             <path
               d="M0 245 L110 245 L165 298 L290 298 L345 345 L465 345"
-              stroke="#aef0ff"
+              stroke={svgColors.veinCore}
               strokeWidth="1.2"
               className="cyber-vein-stream"
             />
             <path
               d="M165 298 L215 245 L330 245 L385 205 L485 205"
-              stroke="#00d4ff"
+              stroke={svgColors.veinBranch}
               strokeWidth="1.3"
               strokeOpacity="0.82"
             />
             <path
               d="M82 375 L195 375 L255 430 L455 430"
-              stroke="#00b4ff"
+              stroke={svgColors.veinMid}
               strokeWidth="1.8"
             />
             <path
               d="M255 430 L300 478 L420 478 L468 518"
-              stroke="#00e5ff"
+              stroke={svgColors.veinBright}
               strokeWidth="1.2"
               strokeOpacity="0.8"
             />
             <path
               d="M115 585 L235 585 L295 535 L462 535"
-              stroke="#0099ff"
+              stroke={svgColors.veinMain}
               strokeWidth="2"
             />
             <path
               d="M115 585 L235 585 L295 535 L462 535"
-              stroke="#9eeaff"
+              stroke={svgColors.veinCore}
               strokeWidth="1.1"
               className="cyber-vein-stream"
             />
             <path
               d="M235 585 L285 645 L395 645 L455 685"
-              stroke="#00c8ff"
+              stroke={svgColors.border}
               strokeWidth="1.2"
               strokeOpacity="0.75"
             />
-            <circle cx="465" cy="345" r="3.5" fill="#7ce7ff" />
-            <circle cx="485" cy="205" r="2.8" fill="#00d4ff" />
-            <circle cx="455" cy="430" r="3.5" fill="#7ce7ff" />
-            <circle cx="462" cy="535" r="3.5" fill="#7ce7ff" />
-            <circle cx="455" cy="685" r="2.8" fill="#00d4ff" />
+            <circle cx="465" cy="345" r="3.5" fill={svgColors.nodeLight} />
+            <circle cx="485" cy="205" r="2.8" fill={svgColors.nodeBright} />
+            <circle cx="455" cy="430" r="3.5" fill={svgColors.nodeLight} />
+            <circle cx="462" cy="535" r="3.5" fill={svgColors.nodeLight} />
+            <circle cx="455" cy="685" r="2.8" fill={svgColors.nodeBright} />
           </g>
 
           {/* Right side 3D armored wing plate & bottom corner armor */}
@@ -337,7 +386,7 @@ export default function App() {
           />
           <path
             d="M1440 160 L1358 230 L1358 540 L1290 640 L1290 900"
-            stroke="#00c8ff"
+            stroke={svgColors.border}
             strokeWidth="2.4"
             filter="url(#neon-blue-vein)"
           />
@@ -349,101 +398,175 @@ export default function App() {
           />
           <path
             d="M1440 805 L1230 805 L1145 865 L1100 900 L1440 900 Z"
-            fill="#07132c"
+            fill={svgColors.cornerFill}
             fillOpacity="0.94"
-            stroke="#00b8ff"
+            stroke={svgColors.plasma1}
             strokeWidth="2"
             filter="url(#neon-blue-vein)"
           />
 
-          {/* Right Cybernetic Blue Veins (symmetrical energy arteries & capillary conduits) */}
+          {/* Right Cybernetic Veins (symmetrical energy arteries & capillary conduits) */}
           <g filter="url(#neon-blue-vein)">
             <path
               d="M1440 245 L1330 245 L1275 298 L1150 298 L1095 345 L975 345"
-              stroke="#009dff"
+              stroke={svgColors.veinMain}
               strokeWidth="2.2"
             />
             <path
               d="M1440 245 L1330 245 L1275 298 L1150 298 L1095 345 L975 345"
-              stroke="#aef0ff"
+              stroke={svgColors.veinCore}
               strokeWidth="1.2"
               className="cyber-vein-stream"
             />
             <path
               d="M1275 298 L1225 245 L1110 245 L1055 205 L955 205"
-              stroke="#00d4ff"
+              stroke={svgColors.veinBranch}
               strokeWidth="1.3"
               strokeOpacity="0.82"
             />
             <path
               d="M1358 375 L1245 375 L1185 430 L985 430"
-              stroke="#00b4ff"
+              stroke={svgColors.veinMid}
               strokeWidth="1.8"
             />
             <path
               d="M1185 430 L1140 478 L1020 478 L972 518"
-              stroke="#00e5ff"
+              stroke={svgColors.veinBright}
               strokeWidth="1.2"
               strokeOpacity="0.8"
             />
             <path
               d="M1325 585 L1205 585 L1145 535 L978 535"
-              stroke="#0099ff"
+              stroke={svgColors.veinMain}
               strokeWidth="2"
             />
             <path
               d="M1325 585 L1205 585 L1145 535 L978 535"
-              stroke="#9eeaff"
+              stroke={svgColors.veinCore}
               strokeWidth="1.1"
               className="cyber-vein-stream"
             />
             <path
               d="M1205 585 L1155 645 L1045 645 L985 685"
-              stroke="#00c8ff"
+              stroke={svgColors.border}
               strokeWidth="1.2"
               strokeOpacity="0.75"
             />
-            <circle cx="975" cy="345" r="3.5" fill="#7ce7ff" />
-            <circle cx="955" cy="205" r="2.8" fill="#00d4ff" />
-            <circle cx="985" cy="430" r="3.5" fill="#7ce7ff" />
-            <circle cx="978" cy="535" r="3.5" fill="#7ce7ff" />
-            <circle cx="985" cy="685" r="2.8" fill="#00d4ff" />
+            <circle cx="975" cy="345" r="3.5" fill={svgColors.nodeLight} />
+            <circle cx="955" cy="205" r="2.8" fill={svgColors.nodeBright} />
+            <circle cx="985" cy="430" r="3.5" fill={svgColors.nodeLight} />
+            <circle cx="978" cy="535" r="3.5" fill={svgColors.nodeLight} />
+            <circle cx="985" cy="685" r="2.8" fill={svgColors.nodeBright} />
           </g>
         </svg>
 
-        <div className="energy-vein-glow absolute top-1/4 left-1/2 h-[500px] w-[720px] -translate-x-1/2 rounded-full bg-sky-500/24 blur-[140px]" />
-        <div className="absolute bottom-0 left-1/2 h-[340px] w-[580px] -translate-x-1/2 rounded-full bg-blue-600/24 blur-[130px]" />
+        <div
+          className={`energy-vein-glow absolute top-1/4 left-1/2 h-[500px] w-[720px] -translate-x-1/2 rounded-full blur-[140px] ${
+            isRedMode ? 'bg-red-500/24' : 'bg-sky-500/24'
+          }`}
+        />
+        <div
+          className={`absolute bottom-0 left-1/2 h-[340px] w-[580px] -translate-x-1/2 rounded-full blur-[130px] ${
+            isRedMode ? 'bg-rose-600/24' : 'bg-blue-600/24'
+          }`}
+        />
       </div>
 
       {/* Stepped Armored Top Navigation Bar */}
-      <header className="combat-topbar relative z-20 flex h-20 items-center justify-between gap-6 px-4 sm:px-6">
+      <header className="combat-topbar relative z-20 flex h-16 sm:h-20 w-full items-center justify-between gap-1.5 sm:gap-4 px-2.5 sm:px-6">
         <div
           aria-hidden="true"
-          className="energy-vein-beam pointer-events-none absolute right-0 bottom-0 left-0 h-[2px] bg-gradient-to-r from-sky-500/40 via-cyan-300 to-sky-500/40"
+          className={`energy-vein-beam pointer-events-none absolute right-0 bottom-0 left-0 h-[2px] bg-gradient-to-r ${
+            isRedMode
+              ? 'from-red-500/40 via-rose-300 to-red-500/40'
+              : 'from-sky-500/40 via-cyan-300 to-sky-500/40'
+          }`}
         />
-        <div className="flex items-center gap-3.5 whitespace-nowrap shrink-0">
-          <div className="relative flex h-14 w-15 sm:h-16 sm:w-17 shrink-0 items-center justify-center">
+        <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
+          <div className="relative flex h-9 w-9 sm:h-16 sm:w-17 shrink-0 items-center justify-center">
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-1 rounded-full bg-sky-400/25 blur-md"
+              className={`pointer-events-none absolute inset-1 rounded-full blur-md ${
+                isRedMode ? 'bg-red-500/35' : 'bg-sky-400/25'
+              }`}
             />
             <img
               src="/assets/aistudio/tamiswap_00325eac.png"
               alt="TamiSwap logo"
               width={68}
               height={64}
-              className="relative z-10 h-14 w-auto sm:h-16 object-contain [image-rendering:-webkit-optimize-contrast]"
+              className={`relative z-10 h-9 w-auto sm:h-16 object-contain [image-rendering:-webkit-optimize-contrast] transition-opacity duration-150 ${
+                isRedMode ? 'opacity-0 pointer-events-none' : 'opacity-100'
+              }`}
+            />
+            <img
+              src="/assets/aistudio/tamiswap_red.png?v=2"
+              alt="TamiSwap logo red mode"
+              width={68}
+              height={64}
+              className={`absolute inset-0 m-auto z-10 h-9 w-auto sm:h-16 object-contain drop-shadow-[0_0_10px_rgba(255,30,56,0.55)] [image-rendering:-webkit-optimize-contrast] transition-opacity duration-150 ${
+                isRedMode ? 'opacity-100' : 'opacity-0 pointer-events-none'
+              }`}
             />
           </div>
-          <span className="font-display text-lg sm:text-xl font-extrabold tracking-widest uppercase whitespace-nowrap shrink-0">
-            <span className="text-white">TAMI</span>
-            <span className="text-sky-400 drop-shadow-[0_0_10px_rgba(56,189,248,0.65)]">
-              SWAP
-            </span>
-          </span>
+          <div className="relative flex items-center shrink min-w-0">
+            <img
+              src="/assets/aistudio/tamiswap1_f57f72d8.png"
+              alt="TamiSwap"
+              width={180}
+              height={60}
+              className={`relative z-10 h-auto max-h-6 w-full max-w-[78px] sm:h-11 sm:max-h-none sm:w-auto sm:max-w-none object-contain drop-shadow-[0_0_12px_rgba(0,180,255,0.45)] [image-rendering:-webkit-optimize-contrast] transition-opacity duration-150 ${
+                isRedMode ? 'opacity-0 pointer-events-none' : 'opacity-100'
+              }`}
+            />
+            <img
+              src="/assets/aistudio/tamiswap1_red.png?v=2"
+              alt="TamiSwap red mode"
+              width={180}
+              height={60}
+              className={`absolute inset-0 z-10 h-full w-full object-contain drop-shadow-[0_0_12px_rgba(255,34,58,0.5)] [image-rendering:-webkit-optimize-contrast] transition-opacity duration-150 ${
+                isRedMode ? 'opacity-100' : 'opacity-0 pointer-events-none'
+              }`}
+            />
+          </div>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+          <div
+            role="group"
+            aria-label="Theme color switch"
+            className={`inline-flex shrink-0 items-center gap-1 rounded-full border p-0.5 transition-colors duration-200 ${
+              isRedMode
+                ? 'border-red-400/80 bg-[#22040a]/90 shadow-[0_0_14px_rgba(255,34,58,0.5)]'
+                : 'border-sky-400/80 bg-[#041024]/90 shadow-[0_0_14px_rgba(0,180,255,0.45)]'
+            }`}
+          >
+            <button
+              type="button"
+              onClick={() => setIsRedMode(false)}
+              aria-pressed={!isRedMode}
+              aria-label="Switch to Blue theme"
+              title="Blue Mode"
+              className={`flex h-5 w-5 sm:h-6 sm:w-6 cursor-pointer items-center justify-center rounded-full transition-all duration-150 ${
+                !isRedMode
+                  ? 'bg-gradient-to-br from-cyan-100 via-sky-400 to-blue-600 shadow-[0_0_10px_rgba(0,212,255,0.95)] ring-1 ring-cyan-200'
+                  : 'bg-sky-500/25 opacity-55 hover:opacity-90'
+              }`}
+            />
+            <button
+              type="button"
+              onClick={() => setIsRedMode(true)}
+              aria-pressed={isRedMode}
+              aria-label="Switch to Red theme"
+              title="Red Mode"
+              className={`flex h-5 w-5 sm:h-6 sm:w-6 cursor-pointer items-center justify-center rounded-full transition-all duration-150 ${
+                isRedMode
+                  ? 'bg-gradient-to-br from-rose-200 via-red-500 to-red-700 shadow-[0_0_10px_rgba(255,40,64,0.95)] ring-1 ring-rose-200'
+                  : 'bg-red-500/25 opacity-55 hover:opacity-90'
+              }`}
+            />
+          </div>
+
           <div className="wallet-cyber-rim">
             <button
               type="button"
@@ -454,9 +577,15 @@ export default function App() {
                   ? () => setShowWalletModal(true)
                   : handleConnectButton
               }
-              className="wallet-cyber-btn inline-flex items-center gap-2 px-4 py-2 font-display text-xs font-bold tracking-wider text-white uppercase whitespace-nowrap shrink-0"
+              className="wallet-cyber-btn inline-flex items-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 font-display text-[10px] sm:text-xs font-bold tracking-wider text-white uppercase whitespace-nowrap shrink-0"
             >
-              <Wallet className="h-3.5 w-3.5 text-cyan-300 drop-shadow-[0_0_6px_rgba(0,212,255,0.9)]" />
+              <Wallet
+                className={`h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0 ${
+                  isRedMode
+                    ? 'text-red-300 drop-shadow-[0_0_6px_rgba(255,40,64,0.9)]'
+                    : 'text-cyan-300 drop-shadow-[0_0_6px_rgba(0,212,255,0.9)]'
+                }`}
+              />
               <span className="chrome-text">
                 {wrongNetwork
                   ? 'Switch to BSC (56)'
@@ -477,7 +606,11 @@ export default function App() {
             className="armor-chassis-shell mb-4 w-full max-w-[500px]"
           >
             <div className="armor-well-rim">
-              <div className="armor-well px-4 py-2.5 text-center text-xs text-cyan-100">
+              <div
+                className={`armor-well px-4 py-2.5 text-center text-xs ${
+                  isRedMode ? 'text-rose-100' : 'text-cyan-100'
+                }`}
+              >
                 {walletNotice}
               </div>
             </div>
@@ -489,6 +622,7 @@ export default function App() {
           provider={activeProvider}
           onConnectWallet={handleConnectButton}
           onSwitchToBsc={handleSwitchToBsc}
+          isRedMode={isRedMode}
         />
       </main>
 
@@ -515,16 +649,24 @@ export default function App() {
                 <div className="armor-chassis relative p-5">
                   <div
                     aria-hidden="true"
-                    className="pointer-events-none absolute top-0 right-6 left-6 h-[1.5px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent"
+                    className={`pointer-events-none absolute top-0 right-6 left-6 h-[1.5px] bg-gradient-to-r from-transparent to-transparent ${
+                      isRedMode ? 'via-red-400' : 'via-cyan-400'
+                    }`}
                   />
-                  <div className="mb-4 flex items-center justify-between border-b border-sky-400/20 pb-3">
+                  <div
+                    className={`mb-4 flex items-center justify-between border-b pb-3 ${
+                      isRedMode ? 'border-red-400/20' : 'border-sky-400/20'
+                    }`}
+                  >
                     <h2 className="font-display chrome-text text-sm font-bold tracking-widest uppercase">
                       {walletAddress ? 'Connected Wallet' : 'Connect DEX Wallet'}
                     </h2>
                     <button
                       type="button"
                       onClick={() => setShowWalletModal(false)}
-                      className="combat-steel-btn p-1.5 text-slate-300 hover:text-cyan-200"
+                      className={`combat-steel-btn p-1.5 text-slate-300 ${
+                        isRedMode ? 'hover:text-red-200' : 'hover:text-cyan-200'
+                      }`}
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -534,7 +676,11 @@ export default function App() {
                     <div className="space-y-4">
                       <div className="armor-well-rim">
                         <div className="armor-well p-3.5">
-                          <div className="text-xs font-semibold tracking-wider text-sky-300 uppercase">
+                          <div
+                            className={`text-xs font-semibold tracking-wider uppercase ${
+                              isRedMode ? 'text-red-300' : 'text-sky-300'
+                            }`}
+                          >
                             Active Address (BNB Chain)
                           </div>
                           <div className="mt-1.5 font-mono text-xs break-all text-slate-100">
@@ -560,7 +706,11 @@ export default function App() {
                           className="combat-steel-btn flex w-full items-center justify-between px-4 py-3 text-left text-xs font-semibold text-slate-100"
                         >
                           <span className="tracking-wide">{w.name}</span>
-                          <span className="font-mono text-[11px] text-cyan-300">
+                          <span
+                            className={`font-mono text-[11px] ${
+                              isRedMode ? 'text-red-300' : 'text-cyan-300'
+                            }`}
+                          >
                             Detected
                           </span>
                         </button>

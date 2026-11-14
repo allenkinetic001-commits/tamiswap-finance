@@ -37,6 +37,7 @@ interface SwapWidgetProps {
   provider: ethers.Eip1193Provider | null;
   onConnectWallet: () => void;
   onSwitchToBsc: () => void;
+  isRedMode?: boolean;
 }
 
 function formatDisplayAmount(rawStr: string, maxDecimals = 6): string {
@@ -60,6 +61,7 @@ export function SwapWidget({
   provider,
   onConnectWallet,
   onSwitchToBsc,
+  isRedMode = false,
 }: SwapWidgetProps) {
   const [tokens, setTokens] = useState<SwapToken[]>(DEFAULT_SWAP_TOKENS);
   const [balances, setBalances] = useState<Record<string, string>>({});
@@ -408,14 +410,18 @@ export function SwapWidget({
       transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
       className="armor-chassis-shell relative w-full max-w-[500px]"
     >
-      {/* Top & bottom central glowing neon-blue flare seams matching armored bezel */}
+      {/* Top & bottom central glowing neon flare seams matching armored bezel */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -top-1.5 left-1/2 z-20 h-3 w-48 -translate-x-1/2 rounded-full bg-cyan-300/90 blur-md"
+        className={`pointer-events-none absolute -top-1.5 left-1/2 z-20 h-3 w-48 -translate-x-1/2 rounded-full blur-md ${
+          isRedMode ? 'bg-red-400/90' : 'bg-cyan-300/90'
+        }`}
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -bottom-1.5 left-1/2 z-20 h-3 w-44 -translate-x-1/2 rounded-full bg-sky-400/85 blur-md"
+        className={`pointer-events-none absolute -bottom-1.5 left-1/2 z-20 h-3 w-44 -translate-x-1/2 rounded-full blur-md ${
+          isRedMode ? 'bg-red-500/85' : 'bg-sky-400/85'
+        }`}
       />
 
       <div className="armor-chassis-rim">
@@ -423,14 +429,18 @@ export function SwapWidget({
           {/* Top & bottom illuminated horizontal plasma seams */}
           <div
             aria-hidden="true"
-            className="energy-vein-beam pointer-events-none absolute top-0 right-6 left-6 h-[2.5px] bg-gradient-to-r from-transparent via-cyan-200 to-transparent"
+            className={`energy-vein-beam pointer-events-none absolute top-0 right-6 left-6 h-[2.5px] bg-gradient-to-r from-transparent to-transparent ${
+              isRedMode ? 'via-rose-200' : 'via-cyan-200'
+            }`}
           />
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute right-8 bottom-0 left-8 h-[2px] bg-gradient-to-r from-transparent via-cyan-300 to-transparent"
+            className={`pointer-events-none absolute right-8 bottom-0 left-8 h-[2px] bg-gradient-to-r from-transparent to-transparent ${
+              isRedMode ? 'via-red-400' : 'via-cyan-300'
+            }`}
           />
 
-          {/* Integrated cybernetic blue vein traces across the armored console */}
+          {/* Integrated cybernetic vein traces across the armored console */}
           <svg
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 h-full w-full opacity-85"
@@ -449,23 +459,23 @@ export function SwapWidget({
             </defs>
             <g filter="url(#card-vein-glow)">
               {/* Top bezel veins */}
-              <path d="M22 8 H125 L144 20 H195" stroke="#00c8ff" strokeWidth="1.5" />
-              <path d="M478 8 H375 L356 20 H305" stroke="#00c8ff" strokeWidth="1.5" />
+              <path d="M22 8 H125 L144 20 H195" stroke={isRedMode ? '#ff223a' : '#00c8ff'} strokeWidth="1.5" />
+              <path d="M478 8 H375 L356 20 H305" stroke={isRedMode ? '#ff223a' : '#00c8ff'} strokeWidth="1.5" />
               {/* Left & right vertical cybernetic vein conduits */}
-              <path d="M8 125 L18 144 V265 L6 286 V365 L18 386 V505 L8 525" stroke="#00aaff" strokeWidth="1.6" />
-              <path d="M492 125 L482 144 V265 L494 286 V365 L482 386 V505 L492 525" stroke="#00aaff" strokeWidth="1.6" />
+              <path d="M8 125 L18 144 V265 L6 286 V365 L18 386 V505 L8 525" stroke={isRedMode ? '#ff1a35' : '#00aaff'} strokeWidth="1.6" />
+              <path d="M492 125 L482 144 V265 L494 286 V365 L482 386 V505 L492 525" stroke={isRedMode ? '#ff1a35' : '#00aaff'} strokeWidth="1.6" />
               {/* Branching capillary veins into top & bottom corners */}
-              <path d="M18 190 L42 205 L60 205" stroke="#38d6ff" strokeWidth="1.1" strokeOpacity="0.7" />
-              <path d="M482 190 L458 205 L440 205" stroke="#38d6ff" strokeWidth="1.1" strokeOpacity="0.7" />
-              <path d="M18 450 L44 466 L68 466" stroke="#38d6ff" strokeWidth="1.1" strokeOpacity="0.7" />
-              <path d="M482 450 L456 466 L432 466" stroke="#38d6ff" strokeWidth="1.1" strokeOpacity="0.7" />
+              <path d="M18 190 L42 205 L60 205" stroke={isRedMode ? '#ff4d63' : '#38d6ff'} strokeWidth="1.1" strokeOpacity="0.7" />
+              <path d="M482 190 L458 205 L440 205" stroke={isRedMode ? '#ff4d63' : '#38d6ff'} strokeWidth="1.1" strokeOpacity="0.7" />
+              <path d="M18 450 L44 466 L68 466" stroke={isRedMode ? '#ff4d63' : '#38d6ff'} strokeWidth="1.1" strokeOpacity="0.7" />
+              <path d="M482 450 L456 466 L432 466" stroke={isRedMode ? '#ff4d63' : '#38d6ff'} strokeWidth="1.1" strokeOpacity="0.7" />
               {/* Bottom bezel veins */}
-              <path d="M22 612 H125 L144 600 H195" stroke="#00c8ff" strokeWidth="1.5" />
-              <path d="M478 612 H375 L356 600 H305" stroke="#00c8ff" strokeWidth="1.5" />
-              <circle cx="195" cy="20" r="2.3" fill="#aef0ff" />
-              <circle cx="305" cy="20" r="2.3" fill="#aef0ff" />
-              <circle cx="195" cy="600" r="2.3" fill="#aef0ff" />
-              <circle cx="305" cy="600" r="2.3" fill="#aef0ff" />
+              <path d="M22 612 H125 L144 600 H195" stroke={isRedMode ? '#ff223a' : '#00c8ff'} strokeWidth="1.5" />
+              <path d="M478 612 H375 L356 600 H305" stroke={isRedMode ? '#ff223a' : '#00c8ff'} strokeWidth="1.5" />
+              <circle cx="195" cy="20" r="2.3" fill={isRedMode ? '#ffb3be' : '#aef0ff'} />
+              <circle cx="305" cy="20" r="2.3" fill={isRedMode ? '#ffb3be' : '#aef0ff'} />
+              <circle cx="195" cy="600" r="2.3" fill={isRedMode ? '#ffb3be' : '#aef0ff'} />
+              <circle cx="305" cy="600" r="2.3" fill={isRedMode ? '#ffb3be' : '#aef0ff'} />
             </g>
           </svg>
 
@@ -475,7 +485,11 @@ export function SwapWidget({
               <h1 className="font-display chrome-text text-2xl font-extrabold tracking-widest uppercase">
                 Swap
               </h1>
-              <p className="mt-1 font-mono text-xs font-medium text-sky-400">
+              <p
+                className={`mt-1 font-mono text-xs font-medium ${
+                  isRedMode ? 'text-red-400' : 'text-sky-400'
+                }`}
+              >
                 THENA RouterV2 · {THENA_ROUTER_V2_ADDRESS.slice(0, 6)}...
                 {THENA_ROUTER_V2_ADDRESS.slice(-4)}
               </p>
@@ -488,10 +502,16 @@ export function SwapWidget({
                   onClick={refreshBalances}
                   disabled={loadingBalances}
                   title="Refresh on-chain balances"
-                  className="combat-steel-btn p-2.5 text-slate-200 hover:text-cyan-300 disabled:opacity-50"
+                  className={`combat-steel-btn p-2.5 text-slate-200 disabled:opacity-50 ${
+                    isRedMode ? 'hover:text-red-300' : 'hover:text-cyan-300'
+                  }`}
                 >
                   <RefreshCw
-                    className={`h-4 w-4 ${loadingBalances ? 'animate-spin text-cyan-300' : ''}`}
+                    className={`h-4 w-4 ${
+                      loadingBalances
+                        ? `animate-spin ${isRedMode ? 'text-red-300' : 'text-cyan-300'}`
+                        : ''
+                    }`}
                   />
                 </button>
               )}
@@ -501,7 +521,11 @@ export function SwapWidget({
                 title="Swap settings"
                 className={`combat-steel-btn p-2.5 ${
                   showSettings
-                    ? 'border-cyan-300 text-cyan-200 shadow-[0_0_18px_rgba(0,200,255,0.45)]'
+                    ? isRedMode
+                      ? 'border-red-300 text-red-200 shadow-[0_0_18px_rgba(255,34,58,0.45)]'
+                      : 'border-cyan-300 text-cyan-200 shadow-[0_0_18px_rgba(0,200,255,0.45)]'
+                    : isRedMode
+                    ? 'text-slate-200 hover:text-red-200'
                     : 'text-slate-200 hover:text-cyan-200'
                 }`}
               >
@@ -526,7 +550,11 @@ export function SwapWidget({
                       <span className="font-semibold tracking-wider uppercase">
                         Slippage Tolerance
                       </span>
-                      <span className="font-mono font-bold text-cyan-300 tabular-nums">
+                      <span
+                        className={`font-mono font-bold tabular-nums ${
+                          isRedMode ? 'text-red-300' : 'text-cyan-300'
+                        }`}
+                      >
                         {slippagePct}%
                       </span>
                     </div>
@@ -539,6 +567,8 @@ export function SwapWidget({
                           className={`flex-1 py-1.5 font-mono text-xs font-semibold transition-all ${
                             slippagePct === val
                               ? 'combat-energy-btn text-white'
+                              : isRedMode
+                              ? 'border border-red-500/25 bg-[#1f060c] text-slate-300 hover:border-red-400/55 hover:text-white'
                               : 'border border-sky-500/25 bg-[#071124] text-slate-300 hover:border-sky-400/55 hover:text-white'
                           }`}
                         >
@@ -556,12 +586,20 @@ export function SwapWidget({
                             Math.max(0.05, Math.min(49, Number(e.target.value) || 0.5))
                           )
                         }
-                        className="w-20 border border-sky-400/40 bg-[#030712] px-2 py-1.5 text-right font-mono text-xs text-cyan-100 tabular-nums focus:border-cyan-300 focus:outline-none"
+                        className={`w-20 border bg-[#030712] px-2 py-1.5 text-right font-mono text-xs tabular-nums focus:outline-none ${
+                          isRedMode
+                            ? 'border-red-400/40 text-rose-100 focus:border-red-300'
+                            : 'border-sky-400/40 text-cyan-100 focus:border-cyan-300'
+                        }`}
                       />
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between border-t border-sky-400/20 pt-2.5">
+                  <div
+                    className={`flex items-center justify-between border-t pt-2.5 ${
+                      isRedMode ? 'border-red-400/20' : 'border-sky-400/20'
+                    }`}
+                  >
                     <span className="font-semibold tracking-wider text-slate-200 uppercase">
                       Transaction Deadline
                     </span>
@@ -576,7 +614,11 @@ export function SwapWidget({
                             Math.max(1, Math.min(120, Number(e.target.value) || 20))
                           )
                         }
-                        className="w-14 border border-sky-400/40 bg-[#030712] px-2 py-1 text-right font-mono text-xs text-cyan-100 tabular-nums focus:border-cyan-300 focus:outline-none"
+                        className={`w-14 border bg-[#030712] px-2 py-1 text-right font-mono text-xs tabular-nums focus:outline-none ${
+                          isRedMode
+                            ? 'border-red-400/40 text-rose-100 focus:border-red-300'
+                            : 'border-sky-400/40 text-cyan-100 focus:border-cyan-300'
+                        }`}
                       />
                       <span className="text-slate-400">min</span>
                     </div>
@@ -588,25 +630,28 @@ export function SwapWidget({
 
           {/* Pool Mode Selector Rail */}
           <div className="armor-well-rim relative z-10 mb-4">
-            <div className="armor-well flex items-center gap-1.5 p-1.5 text-xs">
+            <div className="armor-well grid grid-cols-3 gap-1 p-1 text-[11px] sm:flex sm:items-center sm:gap-1.5 sm:p-1.5 sm:text-xs">
               {(
                 [
-                  { id: 'auto', label: 'Auto Route' },
-                  { id: 'volatile', label: 'Volatile (x·y≥k)' },
-                  { id: 'stable', label: 'Stable (x³y+y³x≥k)' },
+                  { id: 'auto', label: 'Auto Route', mobileLabel: 'Auto Route' },
+                  { id: 'volatile', label: 'Volatile (x·y≥k)', mobileLabel: 'Volatile' },
+                  { id: 'stable', label: 'Stable (x³y+y³x≥k)', mobileLabel: 'Stable' },
                 ] as const
               ).map((opt) => (
                 <button
                   key={opt.id}
                   type="button"
                   onClick={() => setRouteMode(opt.id)}
-                  className={`flex-1 px-2.5 py-2 font-semibold tracking-wide whitespace-nowrap transition-all ${
+                  className={`min-w-0 px-1.5 py-2 sm:flex-1 sm:px-2.5 font-semibold tracking-wide whitespace-nowrap text-center transition-all ${
                     routeMode === opt.id
                       ? 'combat-energy-btn text-white drop-shadow-[0_1px_2px_rgba(2,6,23,0.9)]'
+                      : isRedMode
+                      ? 'border border-transparent text-slate-300 hover:border-red-500/35 hover:text-white'
                       : 'border border-transparent text-slate-300 hover:border-sky-500/35 hover:text-white'
                   }`}
                 >
-                  {opt.label}
+                  <span className="sm:hidden">{opt.mobileLabel}</span>
+                  <span className="hidden sm:inline">{opt.label}</span>
                 </button>
               ))}
             </div>
@@ -630,14 +675,18 @@ export function SwapWidget({
                       <button
                         type="button"
                         onClick={() => handleFillFraction(1, 2)}
-                        className="font-mono text-[11px] font-semibold text-slate-300 transition-colors hover:text-cyan-300"
+                        className={`font-mono text-[11px] font-semibold text-slate-300 transition-colors ${
+                          isRedMode ? 'hover:text-red-300' : 'hover:text-cyan-300'
+                        }`}
                       >
                         50%
                       </button>
                       <button
                         type="button"
                         onClick={() => handleFillFraction(1, 1)}
-                        className="font-mono text-[11px] font-bold text-sky-300 transition-colors hover:text-white"
+                        className={`font-mono text-[11px] font-bold transition-colors hover:text-white ${
+                          isRedMode ? 'text-red-300' : 'text-sky-300'
+                        }`}
                       >
                         MAX
                       </button>
@@ -670,7 +719,7 @@ export function SwapWidget({
                   <span className="font-sans text-sm font-bold tracking-wide text-white">
                     {tokenIn.symbol}
                   </span>
-                  <ChevronDown className="h-4 w-4 text-sky-300" />
+                  <ChevronDown className={`h-4 w-4 ${isRedMode ? 'text-red-300' : 'text-sky-300'}`} />
                 </button>
               </div>
             </div>
@@ -680,7 +729,11 @@ export function SwapWidget({
           <div className="relative z-20 -my-4 flex items-center justify-center">
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute right-10 left-10 h-[2px] bg-gradient-to-r from-transparent via-sky-400 to-transparent shadow-[0_0_10px_rgba(56,189,248,0.8)]"
+              className={`pointer-events-none absolute right-10 left-10 h-[2px] bg-gradient-to-r from-transparent to-transparent ${
+                isRedMode
+                  ? 'via-red-400 shadow-[0_0_10px_rgba(255,34,58,0.85)]'
+                  : 'via-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.8)]'
+              }`}
             />
             <motion.button
               type="button"
@@ -688,7 +741,9 @@ export function SwapWidget({
               animate={{ rotate: flipCount * 180 }}
               transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
               aria-label="Flip swap direction"
-              className="combat-hex-core relative flex h-11 w-12 items-center justify-center text-cyan-200 hover:text-white"
+              className={`combat-hex-core relative flex h-11 w-12 items-center justify-center hover:text-white ${
+                isRedMode ? 'text-red-200' : 'text-cyan-200'
+              }`}
             >
               <ArrowUpDown className="h-4 w-4" />
             </motion.button>
@@ -709,12 +764,22 @@ export function SwapWidget({
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1 truncate font-mono text-2xl sm:text-[28px] font-bold text-white tabular-nums">
                   {quoting && amountInWei > 0n ? (
-                    <span className="inline-flex items-center gap-2 text-base font-medium text-cyan-300">
+                    <span
+                      className={`inline-flex items-center gap-2 text-base font-medium ${
+                        isRedMode ? 'text-red-300' : 'text-cyan-300'
+                      }`}
+                    >
                       <Loader2 className="h-4 w-4 animate-spin" />
                       <span>Quoting BSC...</span>
                     </span>
                   ) : quote ? (
-                    <span className="text-white drop-shadow-[0_0_10px_rgba(56,189,248,0.3)]">
+                    <span
+                      className={`text-white ${
+                        isRedMode
+                          ? 'drop-shadow-[0_0_10px_rgba(255,34,58,0.35)]'
+                          : 'drop-shadow-[0_0_10px_rgba(56,189,248,0.3)]'
+                      }`}
+                    >
                       {formatDisplayAmount(quote.amountOutFormatted)}
                     </span>
                   ) : (
@@ -731,7 +796,7 @@ export function SwapWidget({
                   <span className="font-sans text-sm font-bold tracking-wide text-white">
                     {tokenOut.symbol}
                   </span>
-                  <ChevronDown className="h-4 w-4 text-sky-300" />
+                  <ChevronDown className={`h-4 w-4 ${isRedMode ? 'text-red-300' : 'text-sky-300'}`} />
                 </button>
               </div>
             </div>
@@ -739,7 +804,11 @@ export function SwapWidget({
 
           {/* On-Chain Quote Summary */}
           {quote && amountInWei > 0n && (
-            <div className="relative z-10 mt-4 space-y-2 border-t border-sky-400/25 pt-3.5 text-xs">
+            <div
+              className={`relative z-10 mt-4 space-y-2 border-t pt-3.5 text-xs ${
+                isRedMode ? 'border-red-400/25' : 'border-sky-400/25'
+              }`}
+            >
               <div className="flex items-center justify-between">
                 <span className="text-slate-400">Rate</span>
                 <span className="font-mono text-slate-100 tabular-nums">
@@ -754,7 +823,7 @@ export function SwapWidget({
                 <span className="text-slate-400">
                   Minimum received ({slippagePct}% slippage)
                 </span>
-                <span className="font-mono text-cyan-200 tabular-nums">
+                <span className={`font-mono tabular-nums ${isRedMode ? 'text-rose-200' : 'text-cyan-200'}`}>
                   {formatDisplayAmount(
                     ethers.formatUnits(minReceivedWei, tokenOut.decimals)
                   )}{' '}
@@ -769,6 +838,8 @@ export function SwapWidget({
                       ? 'text-red-400'
                       : quote.priceImpactPct > 1.5
                       ? 'text-amber-300'
+                      : isRedMode
+                      ? 'text-rose-300'
                       : 'text-cyan-300'
                   }`}
                 >
@@ -783,7 +854,7 @@ export function SwapWidget({
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400">On-chain route</span>
-                <span className="font-mono text-cyan-200">
+                <span className={`font-mono ${isRedMode ? 'text-rose-200' : 'text-cyan-200'}`}>
                   {quote.routeSymbols.join(' → ')}
                 </span>
               </div>
@@ -802,14 +873,18 @@ export function SwapWidget({
             </div>
           )}
 
-          {/* Glossy 3D Electric-Blue Primary Action Button */}
+          {/* Glossy 3D Primary Action Button */}
           {!walletAddress ? (
             <button
               type="button"
               onClick={onConnectWallet}
               className="combat-energy-btn font-display relative z-10 mt-5 flex w-full items-center justify-center gap-2.5 px-4 py-3.5 text-xs font-extrabold tracking-widest text-white uppercase drop-shadow-[0_1px_2px_rgba(2,6,23,0.9)]"
             >
-              <Wallet className="h-4 w-4 text-cyan-100 drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
+              <Wallet
+                className={`h-4 w-4 drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] ${
+                  isRedMode ? 'text-rose-100' : 'text-cyan-100'
+                }`}
+              />
               <span>Connect Trust Wallet / Web3</span>
             </button>
           ) : wrongNetwork ? (
@@ -842,7 +917,7 @@ export function SwapWidget({
               disabled
               className="combat-energy-btn font-display relative z-10 mt-5 flex w-full cursor-not-allowed items-center justify-center gap-2 px-4 py-3.5 text-xs font-bold tracking-widest text-slate-300 uppercase"
             >
-              <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
+              <Loader2 className={`h-4 w-4 animate-spin ${isRedMode ? 'text-red-400' : 'text-cyan-400'}`} />
               <span>{quoting ? 'Fetching On-Chain Quote...' : 'Unavailable'}</span>
             </button>
           ) : needsApproval ? (
@@ -894,14 +969,18 @@ export function SwapWidget({
             >
               <div className="armor-well p-3.5 text-xs">
                 {txStatusText && (
-                  <div className="font-medium text-cyan-200">{txStatusText}</div>
+                  <div className={`font-medium ${isRedMode ? 'text-rose-200' : 'text-cyan-200'}`}>
+                    {txStatusText}
+                  </div>
                 )}
                 {txHash && (
                   <a
                     href={`https://bscscan.com/tx/${txHash}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-1.5 inline-flex items-center gap-1 font-mono text-[11px] text-sky-300 hover:text-white hover:underline"
+                    className={`mt-1.5 inline-flex items-center gap-1 font-mono text-[11px] hover:text-white hover:underline ${
+                      isRedMode ? 'text-red-300' : 'text-sky-300'
+                    }`}
                   >
                     <span>
                       View on BscScan ({txHash.slice(0, 10)}...{txHash.slice(-6)})
@@ -938,16 +1017,24 @@ export function SwapWidget({
                 <div className="armor-chassis relative p-5">
                   <div
                     aria-hidden="true"
-                    className="pointer-events-none absolute top-0 right-6 left-6 h-[1.5px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent"
+                    className={`pointer-events-none absolute top-0 right-6 left-6 h-[1.5px] bg-gradient-to-r from-transparent to-transparent ${
+                      isRedMode ? 'via-red-400' : 'via-cyan-400'
+                    }`}
                   />
-                  <div className="mb-3.5 flex items-center justify-between border-b border-sky-400/20 pb-3">
+                  <div
+                    className={`mb-3.5 flex items-center justify-between border-b pb-3 ${
+                      isRedMode ? 'border-red-400/20' : 'border-sky-400/20'
+                    }`}
+                  >
                     <h2 className="font-display chrome-text text-sm font-bold tracking-widest uppercase">
                       Select or Import BEP-20 Token
                     </h2>
                     <button
                       type="button"
                       onClick={() => setSelectorSide(null)}
-                      className="combat-steel-btn p-1.5 text-slate-300 hover:text-cyan-200"
+                      className={`combat-steel-btn p-1.5 text-slate-300 ${
+                        isRedMode ? 'hover:text-red-200' : 'hover:text-cyan-200'
+                      }`}
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -966,7 +1053,11 @@ export function SwapWidget({
 
                   {importingToken && (
                     <div className="armor-well-rim mb-3">
-                      <div className="armor-well flex items-center gap-2 px-3 py-2.5 text-xs text-cyan-300">
+                      <div
+                        className={`armor-well flex items-center gap-2 px-3 py-2.5 text-xs ${
+                          isRedMode ? 'text-red-300' : 'text-cyan-300'
+                        }`}
+                      >
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         <span>Looking up BEP-20 contract on BNB Chain...</span>
                       </div>
@@ -980,11 +1071,17 @@ export function SwapWidget({
                   )}
 
                   {importedCandidate && (
-                    <div className="mb-3 flex items-center justify-between border border-cyan-400/55 bg-sky-500/12 px-3.5 py-2.5 shadow-[0_0_16px_rgba(0,180,255,0.2)]">
+                    <div
+                      className={`mb-3 flex items-center justify-between border px-3.5 py-2.5 ${
+                        isRedMode
+                          ? 'border-red-400/55 bg-red-500/12 shadow-[0_0_16px_rgba(255,34,58,0.2)]'
+                          : 'border-cyan-400/55 bg-sky-500/12 shadow-[0_0_16px_rgba(0,180,255,0.2)]'
+                      }`}
+                    >
                       <div className="flex items-center gap-3">
                         <TokenLogo token={importedCandidate} size={30} />
                         <div>
-                          <div className="font-mono text-sm font-bold text-cyan-100">
+                          <div className={`font-mono text-sm font-bold ${isRedMode ? 'text-rose-100' : 'text-cyan-100'}`}>
                             {importedCandidate.symbol}
                           </div>
                           <div className="text-xs text-slate-300">
@@ -1003,7 +1100,11 @@ export function SwapWidget({
                     </div>
                   )}
 
-                  <div className="max-h-72 divide-y divide-sky-500/15 overflow-y-auto pr-1">
+                  <div
+                    className={`max-h-72 divide-y overflow-y-auto pr-1 ${
+                      isRedMode ? 'divide-red-500/15' : 'divide-sky-500/15'
+                    }`}
+                  >
                     {filteredTokens.map((t) => {
                       const isSelected =
                         (selectorSide === 'in' && t.symbol === tokenInSymbol) ||
@@ -1015,7 +1116,9 @@ export function SwapWidget({
                           onClick={() => handleSelectToken(t)}
                           className={`flex w-full items-center justify-between px-3 py-3 text-left transition-colors ${
                             isSelected
-                              ? 'bg-sky-500/16 shadow-[inset_0_0_14px_rgba(0,180,255,0.16)]'
+                              ? isRedMode
+                                ? 'bg-red-500/16 shadow-[inset_0_0_14px_rgba(255,34,58,0.16)]'
+                                : 'bg-sky-500/16 shadow-[inset_0_0_14px_rgba(0,180,255,0.16)]'
                               : 'hover:bg-slate-800/55'
                           }`}
                         >
@@ -1032,7 +1135,11 @@ export function SwapWidget({
                               </div>
                             </div>
                           </div>
-                          <div className="text-right font-mono text-xs font-medium text-cyan-200 tabular-nums">
+                          <div
+                            className={`text-right font-mono text-xs font-medium tabular-nums ${
+                              isRedMode ? 'text-rose-200' : 'text-cyan-200'
+                            }`}
+                          >
                             {walletAddress
                               ? formatDisplayAmount(balances[t.symbol] || '0')
                               : '—'}
