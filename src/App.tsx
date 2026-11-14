@@ -211,7 +211,7 @@ export default function App() {
 
   return (
     <div className="combat-tech-backdrop relative flex min-h-screen flex-col overflow-x-hidden text-slate-100">
-      {/* Symmetrical Cybernetic Armor Cockpit Backdrop & Electric-Blue Plasma Seams */}
+      {/* Symmetrical Cybernetic Armor Cockpit & Glowing Neon-Blue Vein Network */}
       <div
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 overflow-hidden"
@@ -224,20 +224,27 @@ export default function App() {
           fill="none"
         >
           <defs>
+            <filter id="neon-blue-vein" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="3.5" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
             <linearGradient id="steel-wing-l" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#1e293b" stopOpacity="0.95" />
-              <stop offset="55%" stopColor="#0f172a" stopOpacity="0.92" />
-              <stop offset="100%" stopColor="#334155" stopOpacity="0.88" />
+              <stop offset="0%" stopColor="#0f1e38" stopOpacity="0.96" />
+              <stop offset="55%" stopColor="#091224" stopOpacity="0.94" />
+              <stop offset="100%" stopColor="#1e3a5f" stopOpacity="0.9" />
             </linearGradient>
             <linearGradient id="steel-wing-r" x1="100%" y1="0%" x2="0%" y2="0%">
-              <stop offset="0%" stopColor="#1e293b" stopOpacity="0.95" />
-              <stop offset="55%" stopColor="#0f172a" stopOpacity="0.92" />
-              <stop offset="100%" stopColor="#334155" stopOpacity="0.88" />
+              <stop offset="0%" stopColor="#0f1e38" stopOpacity="0.96" />
+              <stop offset="55%" stopColor="#091224" stopOpacity="0.94" />
+              <stop offset="100%" stopColor="#1e3a5f" stopOpacity="0.9" />
             </linearGradient>
             <linearGradient id="plasma-beam" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#0066ff" stopOpacity="0.2" />
-              <stop offset="50%" stopColor="#38bdf8" stopOpacity="0.95" />
-              <stop offset="100%" stopColor="#bae6fd" stopOpacity="0.95" />
+              <stop offset="0%" stopColor="#0055ff" stopOpacity="0.35" />
+              <stop offset="50%" stopColor="#00b8ff" stopOpacity="1" />
+              <stop offset="100%" stopColor="#cff4ff" stopOpacity="1" />
             </linearGradient>
           </defs>
 
@@ -245,69 +252,167 @@ export default function App() {
           <path
             d="M0 160 L82 230 L82 540 L150 640 L150 900 L0 900 Z"
             fill="url(#steel-wing-l)"
-            opacity="0.82"
+            opacity="0.86"
           />
           <path
             d="M0 160 L82 230 L82 540 L150 640 L150 900"
-            stroke="#38bdf8"
-            strokeWidth="2"
-            strokeOpacity="0.72"
+            stroke="#00c8ff"
+            strokeWidth="2.4"
+            filter="url(#neon-blue-vein)"
           />
           <path
             d="M0 430 L178 605 L295 815 L370 900"
             stroke="url(#plasma-beam)"
-            strokeWidth="2.4"
-          />
-          <path
-            d="M82 320 L185 388 L260 398"
-            stroke="#0ea5e9"
-            strokeWidth="1.2"
-            strokeOpacity="0.55"
+            strokeWidth="2.8"
+            filter="url(#neon-blue-vein)"
           />
           <path
             d="M0 805 L210 805 L295 865 L340 900 L0 900 Z"
-            fill="#0a162d"
-            fillOpacity="0.92"
-            stroke="#38bdf8"
-            strokeWidth="1.8"
-            strokeOpacity="0.75"
+            fill="#07132c"
+            fillOpacity="0.94"
+            stroke="#00b8ff"
+            strokeWidth="2"
+            filter="url(#neon-blue-vein)"
           />
+
+          {/* Left Cybernetic Blue Veins (branching energy arteries & capillary conduits) */}
+          <g filter="url(#neon-blue-vein)">
+            <path
+              d="M0 245 L110 245 L165 298 L290 298 L345 345 L465 345"
+              stroke="#009dff"
+              strokeWidth="2.2"
+            />
+            <path
+              d="M0 245 L110 245 L165 298 L290 298 L345 345 L465 345"
+              stroke="#aef0ff"
+              strokeWidth="1.2"
+              className="cyber-vein-stream"
+            />
+            <path
+              d="M165 298 L215 245 L330 245 L385 205 L485 205"
+              stroke="#00d4ff"
+              strokeWidth="1.3"
+              strokeOpacity="0.82"
+            />
+            <path
+              d="M82 375 L195 375 L255 430 L455 430"
+              stroke="#00b4ff"
+              strokeWidth="1.8"
+            />
+            <path
+              d="M255 430 L300 478 L420 478 L468 518"
+              stroke="#00e5ff"
+              strokeWidth="1.2"
+              strokeOpacity="0.8"
+            />
+            <path
+              d="M115 585 L235 585 L295 535 L462 535"
+              stroke="#0099ff"
+              strokeWidth="2"
+            />
+            <path
+              d="M115 585 L235 585 L295 535 L462 535"
+              stroke="#9eeaff"
+              strokeWidth="1.1"
+              className="cyber-vein-stream"
+            />
+            <path
+              d="M235 585 L285 645 L395 645 L455 685"
+              stroke="#00c8ff"
+              strokeWidth="1.2"
+              strokeOpacity="0.75"
+            />
+            <circle cx="465" cy="345" r="3.5" fill="#7ce7ff" />
+            <circle cx="485" cy="205" r="2.8" fill="#00d4ff" />
+            <circle cx="455" cy="430" r="3.5" fill="#7ce7ff" />
+            <circle cx="462" cy="535" r="3.5" fill="#7ce7ff" />
+            <circle cx="455" cy="685" r="2.8" fill="#00d4ff" />
+          </g>
 
           {/* Right side 3D armored wing plate & bottom corner armor */}
           <path
             d="M1440 160 L1358 230 L1358 540 L1290 640 L1290 900 L1440 900 Z"
             fill="url(#steel-wing-r)"
-            opacity="0.82"
+            opacity="0.86"
           />
           <path
             d="M1440 160 L1358 230 L1358 540 L1290 640 L1290 900"
-            stroke="#38bdf8"
-            strokeWidth="2"
-            strokeOpacity="0.72"
+            stroke="#00c8ff"
+            strokeWidth="2.4"
+            filter="url(#neon-blue-vein)"
           />
           <path
             d="M1440 430 L1262 605 L1145 815 L1070 900"
             stroke="url(#plasma-beam)"
-            strokeWidth="2.4"
-          />
-          <path
-            d="M1358 320 L1255 388 L1180 398"
-            stroke="#0ea5e9"
-            strokeWidth="1.2"
-            strokeOpacity="0.55"
+            strokeWidth="2.8"
+            filter="url(#neon-blue-vein)"
           />
           <path
             d="M1440 805 L1230 805 L1145 865 L1100 900 L1440 900 Z"
-            fill="#0a162d"
-            fillOpacity="0.92"
-            stroke="#38bdf8"
-            strokeWidth="1.8"
-            strokeOpacity="0.75"
+            fill="#07132c"
+            fillOpacity="0.94"
+            stroke="#00b8ff"
+            strokeWidth="2"
+            filter="url(#neon-blue-vein)"
           />
+
+          {/* Right Cybernetic Blue Veins (symmetrical energy arteries & capillary conduits) */}
+          <g filter="url(#neon-blue-vein)">
+            <path
+              d="M1440 245 L1330 245 L1275 298 L1150 298 L1095 345 L975 345"
+              stroke="#009dff"
+              strokeWidth="2.2"
+            />
+            <path
+              d="M1440 245 L1330 245 L1275 298 L1150 298 L1095 345 L975 345"
+              stroke="#aef0ff"
+              strokeWidth="1.2"
+              className="cyber-vein-stream"
+            />
+            <path
+              d="M1275 298 L1225 245 L1110 245 L1055 205 L955 205"
+              stroke="#00d4ff"
+              strokeWidth="1.3"
+              strokeOpacity="0.82"
+            />
+            <path
+              d="M1358 375 L1245 375 L1185 430 L985 430"
+              stroke="#00b4ff"
+              strokeWidth="1.8"
+            />
+            <path
+              d="M1185 430 L1140 478 L1020 478 L972 518"
+              stroke="#00e5ff"
+              strokeWidth="1.2"
+              strokeOpacity="0.8"
+            />
+            <path
+              d="M1325 585 L1205 585 L1145 535 L978 535"
+              stroke="#0099ff"
+              strokeWidth="2"
+            />
+            <path
+              d="M1325 585 L1205 585 L1145 535 L978 535"
+              stroke="#9eeaff"
+              strokeWidth="1.1"
+              className="cyber-vein-stream"
+            />
+            <path
+              d="M1205 585 L1155 645 L1045 645 L985 685"
+              stroke="#00c8ff"
+              strokeWidth="1.2"
+              strokeOpacity="0.75"
+            />
+            <circle cx="975" cy="345" r="3.5" fill="#7ce7ff" />
+            <circle cx="955" cy="205" r="2.8" fill="#00d4ff" />
+            <circle cx="985" cy="430" r="3.5" fill="#7ce7ff" />
+            <circle cx="978" cy="535" r="3.5" fill="#7ce7ff" />
+            <circle cx="985" cy="685" r="2.8" fill="#00d4ff" />
+          </g>
         </svg>
 
-        <div className="energy-vein-glow absolute top-1/4 left-1/2 h-[480px] w-[680px] -translate-x-1/2 rounded-full bg-sky-500/18 blur-[135px]" />
-        <div className="absolute bottom-0 left-1/2 h-[320px] w-[540px] -translate-x-1/2 rounded-full bg-blue-700/18 blur-[125px]" />
+        <div className="energy-vein-glow absolute top-1/4 left-1/2 h-[500px] w-[720px] -translate-x-1/2 rounded-full bg-sky-500/24 blur-[140px]" />
+        <div className="absolute bottom-0 left-1/2 h-[340px] w-[580px] -translate-x-1/2 rounded-full bg-blue-600/24 blur-[130px]" />
       </div>
 
       {/* Stepped Armored Top Navigation Bar */}

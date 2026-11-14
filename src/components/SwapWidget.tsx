@@ -407,14 +407,14 @@ export function SwapWidget({
       transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
       className="armor-chassis-shell relative w-full max-w-[500px]"
     >
-      {/* Top & bottom central electric-blue flare seams matching armored bezel */}
+      {/* Top & bottom central glowing neon-blue flare seams matching armored bezel */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -top-1 left-1/2 z-20 h-2 w-40 -translate-x-1/2 rounded-full bg-cyan-300/75 blur-md"
+        className="pointer-events-none absolute -top-1.5 left-1/2 z-20 h-3 w-48 -translate-x-1/2 rounded-full bg-cyan-300/90 blur-md"
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -bottom-1 left-1/2 z-20 h-2 w-36 -translate-x-1/2 rounded-full bg-sky-400/65 blur-md"
+        className="pointer-events-none absolute -bottom-1.5 left-1/2 z-20 h-3 w-44 -translate-x-1/2 rounded-full bg-sky-400/85 blur-md"
       />
 
       <div className="armor-chassis-rim">
@@ -422,27 +422,50 @@ export function SwapWidget({
           {/* Top & bottom illuminated horizontal plasma seams */}
           <div
             aria-hidden="true"
-            className="energy-vein-beam pointer-events-none absolute top-0 right-6 left-6 h-[2px] bg-gradient-to-r from-transparent via-cyan-200 to-transparent"
+            className="energy-vein-beam pointer-events-none absolute top-0 right-6 left-6 h-[2.5px] bg-gradient-to-r from-transparent via-cyan-200 to-transparent"
           />
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute right-8 bottom-0 left-8 h-[1.5px] bg-gradient-to-r from-transparent via-sky-300 to-transparent"
+            className="pointer-events-none absolute right-8 bottom-0 left-8 h-[2px] bg-gradient-to-r from-transparent via-cyan-300 to-transparent"
           />
 
-          {/* Side & corner armor clamp notches */}
+          {/* Integrated cybernetic blue vein traces across the armored console */}
           <svg
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 h-full w-full opacity-75"
+            className="pointer-events-none absolute inset-0 h-full w-full opacity-85"
             preserveAspectRatio="none"
             viewBox="0 0 500 620"
             fill="none"
           >
-            <path d="M24 8 H115 L130 17" stroke="#7dd3fc" strokeWidth="1.2" strokeOpacity="0.6" />
-            <path d="M476 8 H385 L370 17" stroke="#7dd3fc" strokeWidth="1.2" strokeOpacity="0.6" />
-            <path d="M8 140 L16 156 V270 L8 286" stroke="#38bdf8" strokeWidth="1.4" strokeOpacity="0.55" />
-            <path d="M492 140 L484 156 V270 L492 286" stroke="#38bdf8" strokeWidth="1.4" strokeOpacity="0.55" />
-            <path d="M24 612 H115 L130 603" stroke="#38bdf8" strokeWidth="1.2" strokeOpacity="0.55" />
-            <path d="M476 612 H385 L370 603" stroke="#38bdf8" strokeWidth="1.2" strokeOpacity="0.55" />
+            <defs>
+              <filter id="card-vein-glow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="2.5" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+            <g filter="url(#card-vein-glow)">
+              {/* Top bezel veins */}
+              <path d="M22 8 H125 L144 20 H195" stroke="#00c8ff" strokeWidth="1.5" />
+              <path d="M478 8 H375 L356 20 H305" stroke="#00c8ff" strokeWidth="1.5" />
+              {/* Left & right vertical cybernetic vein conduits */}
+              <path d="M8 125 L18 144 V265 L6 286 V365 L18 386 V505 L8 525" stroke="#00aaff" strokeWidth="1.6" />
+              <path d="M492 125 L482 144 V265 L494 286 V365 L482 386 V505 L492 525" stroke="#00aaff" strokeWidth="1.6" />
+              {/* Branching capillary veins into top & bottom corners */}
+              <path d="M18 190 L42 205 L60 205" stroke="#38d6ff" strokeWidth="1.1" strokeOpacity="0.7" />
+              <path d="M482 190 L458 205 L440 205" stroke="#38d6ff" strokeWidth="1.1" strokeOpacity="0.7" />
+              <path d="M18 450 L44 466 L68 466" stroke="#38d6ff" strokeWidth="1.1" strokeOpacity="0.7" />
+              <path d="M482 450 L456 466 L432 466" stroke="#38d6ff" strokeWidth="1.1" strokeOpacity="0.7" />
+              {/* Bottom bezel veins */}
+              <path d="M22 612 H125 L144 600 H195" stroke="#00c8ff" strokeWidth="1.5" />
+              <path d="M478 612 H375 L356 600 H305" stroke="#00c8ff" strokeWidth="1.5" />
+              <circle cx="195" cy="20" r="2.3" fill="#aef0ff" />
+              <circle cx="305" cy="20" r="2.3" fill="#aef0ff" />
+              <circle cx="195" cy="600" r="2.3" fill="#aef0ff" />
+              <circle cx="305" cy="600" r="2.3" fill="#aef0ff" />
+            </g>
           </svg>
 
           {/* Card Header */}
