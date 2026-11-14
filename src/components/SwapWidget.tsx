@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ethers } from 'ethers';
+import { AnimatePresence, motion } from 'motion/react';
 import {
   ArrowUpDown,
   ChevronDown,
@@ -25,6 +26,7 @@ import {
   fetchWalletBalances,
   OnChainQuote,
 } from '../utils/bscWeb3';
+import { TokenLogo } from './TokenLogo';
 
 type RouteMode = 'auto' | 'volatile' | 'stable';
 
@@ -69,6 +71,7 @@ export function SwapWidget({
   const [slippagePct, setSlippagePct] = useState(0.5);
   const [deadlineMin, setDeadlineMin] = useState(20);
   const [showSettings, setShowSettings] = useState(false);
+  const [flipCount, setFlipCount] = useState(0);
 
   // Token selector & custom BEP-20 import state
   const [selectorSide, setSelectorSide] = useState<'in' | 'out' | null>(null);
@@ -266,6 +269,7 @@ export function SwapWidget({
   }, [quote, slippagePct]);
 
   function handleFlipTokens() {
+    setFlipCount((c) => c + 1);
     setTokenInSymbol(tokenOutSymbol);
     setTokenOutSymbol(tokenInSymbol);
     setTxHash(null);
@@ -397,31 +401,42 @@ export function SwapWidget({
   }, [quote, amountInWei, tokenIn.decimals]);
 
   return (
-    <div className="w-full max-w-[480px]">
-      <div className="rounded-xl border border-slate-800/90 bg-[#111622] p-5">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+      className="w-full max-w-[480px]"
+    >
+      <div className="cyber-chassis relative overflow-hidden rounded-2xl p-5 sm:p-6">
+        {/* Top glowing neon scan hairline */}
+        <div
+          aria-hidden="true"
+          className="cyber-top-beam pointer-events-none absolute top-0 right-0 left-0 h-[1.5px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent"
+        />
+
         {/* Card Header */}
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-5 flex items-center justify-between">
           <div>
-            <h1 className="font-display text-lg font-semibold tracking-tight text-slate-50">
+            <h1 className="font-display chrome-text text-xl font-bold tracking-wider uppercase">
               Swap
             </h1>
-            <p className="font-mono text-[11px] text-slate-400">
+            <p className="mt-0.5 font-mono text-[11px] text-cyan-300/70">
               THENA RouterV2 · {THENA_ROUTER_V2_ADDRESS.slice(0, 6)}...
               {THENA_ROUTER_V2_ADDRESS.slice(-4)}
             </p>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             {walletAddress && (
               <button
                 type="button"
                 onClick={refreshBalances}
                 disabled={loadingBalances}
                 title="Refresh on-chain balances"
-                className="rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-800/70 hover:text-slate-200 disabled:opacity-50"
+                className="cyber-chrome-btn rounded-lg p-2 text-slate-300 hover:text-cyan-300 disabled:opacity-50"
               >
                 <RefreshCw
-                  className={`h-4 w-4 ${loadingBalances ? 'animate-spin' : ''}`}
+                  className={`h-4 w-4 ${loadingBalances ? 'animate-spin text-cyan-300' : ''}`}
                 />
               </button>
             )}
@@ -429,10 +444,10 @@ export function SwapWidget({
               type="button"
               onClick={() => setShowSettings((s) => !s)}
               title="Swap settings"
-              className={`rounded-md p-2 transition-colors ${
+              className={`cyber-chrome-btn rounded-lg p-2 ${
                 showSettings
-                  ? 'bg-amber-500/15 text-amber-300'
-                  : 'text-slate-400 hover:bg-slate-800/70 hover:text-slate-200'
+                  ? 'border-cyan-400/70 text-cyan-300 shadow-[0_0_16px_rgba(0,229,255,0.28)]'
+                  : 'text-slate-300 hover:text-cyan-200'
               }`}
             >
               <Settings className="h-4 w-4" />
@@ -441,69 +456,79 @@ export function SwapWidget({
         </div>
 
         {/* Settings Drawer */}
-        {showSettings && (
-          <div className="mb-4 space-y-3 rounded-lg border border-slate-800 bg-[#0B0E14] p-3.5 text-xs">
-            <div>
-              <div className="mb-1.5 flex items-center justify-between text-slate-400">
-                <span>Slippage Tolerance</span>
-                <span className="font-mono text-slate-200 tabular-nums">
-                  {slippagePct}%
-                </span>
+        <AnimatePresence>
+          {showSettings && (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.15 }}
+              className="cyber-well mb-4 space-y-3 rounded-xl p-3.5 text-xs"
+            >
+              <div>
+                <div className="mb-2 flex items-center justify-between text-slate-300">
+                  <span className="font-medium tracking-wide uppercase">Slippage Tolerance</span>
+                  <span className="font-mono font-semibold text-cyan-300 tabular-nums">
+                    {slippagePct}%
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {[0.1, 0.5, 1.0].map((val) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setSlippagePct(val)}
+                      className={`flex-1 rounded-md py-1.5 font-mono text-xs font-semibold transition-all ${
+                        slippagePct === val
+                          ? 'border border-cyan-400/60 bg-cyan-500/20 text-cyan-200 shadow-[0_0_12px_rgba(0,229,255,0.2)]'
+                          : 'border border-slate-800 bg-[#0d1526] text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                      }`}
+                    >
+                      {val}%
+                    </button>
+                  ))}
+                  <input
+                    type="number"
+                    min={0.05}
+                    max={49}
+                    step={0.1}
+                    value={slippagePct}
+                    onChange={(e) =>
+                      setSlippagePct(
+                        Math.max(0.05, Math.min(49, Number(e.target.value) || 0.5))
+                      )
+                    }
+                    className="w-20 rounded-md border border-slate-700/80 bg-[#050811] px-2 py-1.5 text-right font-mono text-xs text-cyan-100 tabular-nums focus:border-cyan-400 focus:outline-none"
+                  />
+                </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                {[0.1, 0.5, 1.0].map((val) => (
-                  <button
-                    key={val}
-                    type="button"
-                    onClick={() => setSlippagePct(val)}
-                    className={`flex-1 rounded py-1 font-mono text-xs transition-colors ${
-                      slippagePct === val
-                        ? 'bg-amber-500/20 font-semibold text-amber-300'
-                        : 'bg-[#111622] text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    {val}%
-                  </button>
-                ))}
-                <input
-                  type="number"
-                  min={0.05}
-                  max={49}
-                  step={0.1}
-                  value={slippagePct}
-                  onChange={(e) =>
-                    setSlippagePct(
-                      Math.max(0.05, Math.min(49, Number(e.target.value) || 0.5))
-                    )
-                  }
-                  className="w-20 rounded border border-slate-800 bg-[#111622] px-2 py-1 text-right font-mono text-xs text-slate-100 tabular-nums focus:border-amber-500/60 focus:outline-none"
-                />
-              </div>
-            </div>
 
-            <div className="flex items-center justify-between border-t border-slate-800/80 pt-2.5">
-              <span className="text-slate-400">Transaction Deadline</span>
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="number"
-                  min={1}
-                  max={120}
-                  value={deadlineMin}
-                  onChange={(e) =>
-                    setDeadlineMin(
-                      Math.max(1, Math.min(120, Number(e.target.value) || 20))
-                    )
-                  }
-                  className="w-14 rounded border border-slate-800 bg-[#111622] px-2 py-1 text-right font-mono text-xs text-slate-100 tabular-nums focus:border-amber-500/60 focus:outline-none"
-                />
-                <span className="text-slate-500">min</span>
+              <div className="flex items-center justify-between border-t border-cyan-500/15 pt-2.5">
+                <span className="font-medium tracking-wide text-slate-300 uppercase">
+                  Transaction Deadline
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    min={1}
+                    max={120}
+                    value={deadlineMin}
+                    onChange={(e) =>
+                      setDeadlineMin(
+                        Math.max(1, Math.min(120, Number(e.target.value) || 20))
+                      )
+                    }
+                    className="w-14 rounded-md border border-slate-700/80 bg-[#050811] px-2 py-1 text-right font-mono text-xs text-cyan-100 tabular-nums focus:border-cyan-400 focus:outline-none"
+                  />
+                  <span className="text-slate-400">min</span>
+                </div>
               </div>
-            </div>
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Pool Mode Selector */}
-        <div className="mb-3 flex items-center gap-1 rounded-lg bg-[#0B0E14] p-1 text-xs">
+        <div className="cyber-well mb-3.5 flex items-center gap-1 rounded-xl p-1 text-xs">
           {(
             [
               { id: 'auto', label: 'Auto Route' },
@@ -515,10 +540,10 @@ export function SwapWidget({
               key={opt.id}
               type="button"
               onClick={() => setRouteMode(opt.id)}
-              className={`flex-1 rounded-md px-2 py-1.5 font-medium whitespace-nowrap transition-colors ${
+              className={`flex-1 rounded-lg px-2 py-1.5 font-semibold tracking-wide whitespace-nowrap transition-all ${
                 routeMode === opt.id
-                  ? 'bg-[#182030] text-amber-300'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'border border-cyan-400/50 bg-gradient-to-b from-cyan-500/25 to-blue-600/25 text-cyan-200 shadow-[0_0_14px_rgba(0,229,255,0.22),inset_0_1px_0_rgba(255,255,255,0.2)]'
+                  : 'border border-transparent text-slate-400 hover:text-slate-200'
               }`}
             >
               {opt.label}
@@ -527,9 +552,11 @@ export function SwapWidget({
         </div>
 
         {/* You Pay */}
-        <div className="rounded-lg border border-slate-800/90 bg-[#0B0E14] p-4">
-          <div className="mb-2 flex items-center justify-between text-xs">
-            <span className="text-slate-400">You pay</span>
+        <div className="cyber-well rounded-xl p-4">
+          <div className="mb-2.5 flex items-center justify-between text-xs">
+            <span className="font-semibold tracking-wider text-slate-400 uppercase">
+              You pay
+            </span>
             <div className="flex items-center gap-2">
               <span className="font-mono text-slate-400 tabular-nums">
                 {walletAddress
@@ -541,14 +568,14 @@ export function SwapWidget({
                   <button
                     type="button"
                     onClick={() => handleFillFraction(1, 2)}
-                    className="font-mono text-[11px] text-slate-400 hover:text-amber-300"
+                    className="font-mono text-[11px] font-medium text-slate-300 transition-colors hover:text-cyan-300"
                   >
                     50%
                   </button>
                   <button
                     type="button"
                     onClick={() => handleFillFraction(1, 1)}
-                    className="font-mono text-[11px] font-semibold text-amber-400 hover:text-amber-300"
+                    className="font-mono text-[11px] font-bold text-cyan-300 transition-colors hover:text-cyan-200"
                   >
                     MAX
                   </button>
@@ -570,49 +597,56 @@ export function SwapWidget({
                 setTxStatusText(null);
               }}
               placeholder="0.0"
-              className="min-w-0 flex-1 bg-transparent font-mono text-2xl font-semibold text-slate-50 placeholder-slate-600 tabular-nums focus:outline-none"
+              className="min-w-0 flex-1 bg-transparent font-mono text-2xl font-bold text-white placeholder-slate-600 tabular-nums focus:outline-none"
             />
             <button
               type="button"
               onClick={() => setSelectorSide('in')}
-              className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-slate-700/80 bg-[#161D2C] px-3 py-2 text-sm font-semibold text-slate-100 whitespace-nowrap transition-colors hover:border-slate-600 hover:bg-[#1C2436]"
+              className="cyber-chrome-btn inline-flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold tracking-wide text-slate-50 whitespace-nowrap"
             >
-              <span>{tokenIn.symbol}</span>
-              <ChevronDown className="h-4 w-4 text-slate-400" />
+              <TokenLogo token={tokenIn} size={22} />
+              <span className="chrome-text">{tokenIn.symbol}</span>
+              <ChevronDown className="h-4 w-4 text-cyan-300" />
             </button>
           </div>
         </div>
 
-        {/* Flip Button */}
-        <div className="-my-3 relative z-10 flex justify-center">
-          <button
+        {/* Glossy 3D Flip Button */}
+        <div className="-my-3.5 relative z-10 flex justify-center">
+          <motion.button
             type="button"
             onClick={handleFlipTokens}
+            animate={{ rotate: flipCount * 180 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
             aria-label="Flip swap direction"
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700/90 bg-[#161D2C] text-slate-300 transition-colors hover:border-amber-500/50 hover:text-amber-300"
+            className="cyber-chrome-btn flex h-10 w-10 items-center justify-center rounded-xl text-cyan-300 hover:text-cyan-200"
           >
             <ArrowUpDown className="h-4 w-4" />
-          </button>
+          </motion.button>
         </div>
 
         {/* You Receive */}
-        <div className="rounded-lg border border-slate-800/90 bg-[#0B0E14] p-4">
-          <div className="mb-2 flex items-center justify-between text-xs">
-            <span className="text-slate-400">You receive</span>
+        <div className="cyber-well rounded-xl p-4">
+          <div className="mb-2.5 flex items-center justify-between text-xs">
+            <span className="font-semibold tracking-wider text-slate-400 uppercase">
+              You receive
+            </span>
             <span className="font-mono text-slate-400 tabular-nums">
               {walletAddress ? `Bal: ${formatDisplayAmount(balanceOutStr)}` : ''}
             </span>
           </div>
 
           <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0 flex-1 truncate font-mono text-2xl font-semibold text-slate-50 tabular-nums">
+            <div className="min-w-0 flex-1 truncate font-mono text-2xl font-bold text-white tabular-nums">
               {quoting && amountInWei > 0n ? (
-                <span className="inline-flex items-center gap-2 text-lg text-slate-400">
+                <span className="inline-flex items-center gap-2 text-base font-medium text-cyan-300">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>Quoting BSC...</span>
                 </span>
               ) : quote ? (
-                formatDisplayAmount(quote.amountOutFormatted)
+                <span className="text-cyan-50 drop-shadow-[0_0_12px_rgba(0,229,255,0.25)]">
+                  {formatDisplayAmount(quote.amountOutFormatted)}
+                </span>
               ) : (
                 <span className="text-slate-600">0.0</span>
               )}
@@ -621,17 +655,18 @@ export function SwapWidget({
             <button
               type="button"
               onClick={() => setSelectorSide('out')}
-              className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-slate-700/80 bg-[#161D2C] px-3 py-2 text-sm font-semibold text-slate-100 whitespace-nowrap transition-colors hover:border-slate-600 hover:bg-[#1C2436]"
+              className="cyber-chrome-btn inline-flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold tracking-wide text-slate-50 whitespace-nowrap"
             >
-              <span>{tokenOut.symbol}</span>
-              <ChevronDown className="h-4 w-4 text-slate-400" />
+              <TokenLogo token={tokenOut} size={22} />
+              <span className="chrome-text">{tokenOut.symbol}</span>
+              <ChevronDown className="h-4 w-4 text-cyan-300" />
             </button>
           </div>
         </div>
 
         {/* On-Chain Quote Summary */}
         {quote && amountInWei > 0n && (
-          <div className="mt-4 space-y-2 border-t border-slate-800/80 pt-3.5 text-xs">
+          <div className="mt-4 space-y-2 border-t border-cyan-500/20 pt-3.5 text-xs">
             <div className="flex items-center justify-between">
               <span className="text-slate-400">Rate</span>
               <span className="font-mono text-slate-200 tabular-nums">
@@ -646,7 +681,7 @@ export function SwapWidget({
               <span className="text-slate-400">
                 Minimum received ({slippagePct}% slippage)
               </span>
-              <span className="font-mono text-slate-200 tabular-nums">
+              <span className="font-mono text-cyan-200 tabular-nums">
                 {formatDisplayAmount(
                   ethers.formatUnits(minReceivedWei, tokenOut.decimals)
                 )}{' '}
@@ -656,12 +691,12 @@ export function SwapWidget({
             <div className="flex items-center justify-between">
               <span className="text-slate-400">Price impact</span>
               <span
-                className={`font-mono tabular-nums ${
+                className={`font-mono font-semibold tabular-nums ${
                   quote.priceImpactPct > 5
                     ? 'text-red-400'
                     : quote.priceImpactPct > 1.5
-                    ? 'text-amber-400'
-                    : 'text-emerald-400'
+                    ? 'text-amber-300'
+                    : 'text-cyan-300'
                 }`}
               >
                 {quote.priceImpactPct.toFixed(2)}%
@@ -675,7 +710,7 @@ export function SwapWidget({
             </div>
             <div className="flex items-center justify-between">
               <span className="text-slate-400">On-chain route</span>
-              <span className="font-mono text-slate-300">
+              <span className="font-mono text-cyan-200">
                 {quote.routeSymbols.join(' → ')}
               </span>
             </div>
@@ -683,23 +718,23 @@ export function SwapWidget({
         )}
 
         {quoteError && (
-          <div className="mt-3 rounded border border-amber-900/60 bg-amber-950/30 px-3 py-2 text-xs text-amber-300">
+          <div className="mt-3 rounded-lg border border-amber-400/35 bg-amber-950/30 px-3.5 py-2 text-xs text-amber-200">
             {quoteError}
           </div>
         )}
 
         {txError && (
-          <div className="mt-3 rounded border border-red-900/60 bg-red-950/30 px-3 py-2 text-xs text-red-300">
+          <div className="mt-3 rounded-lg border border-red-500/45 bg-red-950/35 px-3.5 py-2 text-xs text-red-200">
             {txError}
           </div>
         )}
 
-        {/* Primary Action Button */}
+        {/* Glossy 3D Primary Action Button */}
         {!walletAddress ? (
           <button
             type="button"
             onClick={onConnectWallet}
-            className="mt-4 flex w-full items-center justify-center rounded-lg bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-950 transition-colors hover:bg-amber-400"
+            className="cyber-primary-btn font-display mt-5 flex w-full items-center justify-center rounded-xl px-4 py-3.5 text-xs font-bold tracking-wider text-slate-950 uppercase"
           >
             Connect Trust Wallet / Web3
           </button>
@@ -707,7 +742,7 @@ export function SwapWidget({
           <button
             type="button"
             onClick={onSwitchToBsc}
-            className="mt-4 flex w-full items-center justify-center rounded-lg bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-950 transition-colors hover:bg-amber-400"
+            className="cyber-primary-btn font-display mt-5 flex w-full items-center justify-center rounded-xl px-4 py-3.5 text-xs font-bold tracking-wider text-slate-950 uppercase"
           >
             Switch to BNB Smart Chain (56)
           </button>
@@ -715,7 +750,7 @@ export function SwapWidget({
           <button
             type="button"
             disabled
-            className="mt-4 flex w-full cursor-not-allowed items-center justify-center rounded-lg bg-slate-800 px-4 py-3 text-sm font-semibold text-slate-500"
+            className="cyber-primary-btn font-display mt-5 flex w-full cursor-not-allowed items-center justify-center rounded-xl px-4 py-3.5 text-xs font-bold tracking-wider text-slate-500 uppercase"
           >
             Enter an amount
           </button>
@@ -723,7 +758,7 @@ export function SwapWidget({
           <button
             type="button"
             disabled
-            className="mt-4 flex w-full cursor-not-allowed items-center justify-center rounded-lg bg-slate-800 px-4 py-3 text-sm font-semibold text-slate-500"
+            className="cyber-primary-btn font-display mt-5 flex w-full cursor-not-allowed items-center justify-center rounded-xl px-4 py-3.5 text-xs font-bold tracking-wider text-slate-500 uppercase"
           >
             Insufficient {tokenIn.symbol} balance
           </button>
@@ -731,9 +766,9 @@ export function SwapWidget({
           <button
             type="button"
             disabled
-            className="mt-4 flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 py-3 text-sm font-semibold text-slate-400"
+            className="cyber-primary-btn font-display mt-5 flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl px-4 py-3.5 text-xs font-bold tracking-wider text-slate-400 uppercase"
           >
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
             <span>{quoting ? 'Fetching On-Chain Quote...' : 'Unavailable'}</span>
           </button>
         ) : needsApproval ? (
@@ -741,7 +776,7 @@ export function SwapWidget({
             type="button"
             onClick={handleApprove}
             disabled={txPending !== null}
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-950 transition-colors hover:bg-amber-400 disabled:opacity-60"
+            className="cyber-primary-btn font-display mt-5 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3.5 text-xs font-bold tracking-wider text-slate-950 uppercase disabled:opacity-60"
           >
             {txPending === 'approve' ? (
               <>
@@ -757,7 +792,7 @@ export function SwapWidget({
             type="button"
             onClick={handleSwap}
             disabled={txPending !== null}
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-950 transition-colors hover:bg-amber-400 disabled:opacity-60"
+            className="cyber-primary-btn font-display mt-5 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3.5 text-xs font-bold tracking-wider text-slate-950 uppercase disabled:opacity-60"
           >
             {txPending === 'swap' ? (
               <>
@@ -778,16 +813,20 @@ export function SwapWidget({
 
         {/* Transaction Receipt / Status */}
         {(txStatusText || txHash) && (
-          <div className="mt-4 rounded-lg border border-emerald-900/60 bg-emerald-950/20 p-3.5 text-xs">
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-4 rounded-xl border border-cyan-400/35 bg-cyan-950/25 p-3.5 text-xs shadow-[0_0_20px_rgba(0,229,255,0.12)]"
+          >
             {txStatusText && (
-              <div className="font-medium text-emerald-300">{txStatusText}</div>
+              <div className="font-medium text-cyan-200">{txStatusText}</div>
             )}
             {txHash && (
               <a
                 href={`https://bscscan.com/tx/${txHash}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-1.5 inline-flex items-center gap-1 font-mono text-[11px] text-amber-300 hover:underline"
+                className="mt-1.5 inline-flex items-center gap-1 font-mono text-[11px] text-cyan-300 hover:text-white hover:underline"
               >
                 <span>
                   View on BscScan ({txHash.slice(0, 10)}...{txHash.slice(-6)})
@@ -795,112 +834,130 @@ export function SwapWidget({
                 <ExternalLink className="h-3 w-3" />
               </a>
             )}
-          </div>
+          </motion.div>
         )}
       </div>
 
       {/* Token Selector Modal + Custom BEP-20 Address Import */}
-      {selectorSide && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          onClick={() => setSelectorSide(null)}
-        >
-          <div
-            className="w-full max-w-md rounded-xl border border-slate-800 bg-[#111622] p-5"
-            onClick={(e) => e.stopPropagation()}
+      <AnimatePresence>
+        {selectorSide && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.16 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+            onClick={() => setSelectorSide(null)}
           >
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-100">
-                Select or Import BEP-20 Token
-              </h2>
-              <button
-                type="button"
-                onClick={() => setSelectorSide(null)}
-                className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <input
-              type="text"
-              autoFocus
-              value={tokenSearch}
-              onChange={(e) => setTokenSearch(e.target.value)}
-              placeholder="Search symbol or paste 0x BEP-20 contract..."
-              className="mb-3 w-full rounded-lg border border-slate-800 bg-[#0B0E14] px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:border-amber-500/60 focus:outline-none"
-            />
-
-            {importingToken && (
-              <div className="mb-3 flex items-center gap-2 rounded-lg border border-slate-800 bg-[#0B0E14] px-3 py-2.5 text-xs text-slate-400">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                <span>Looking up BEP-20 contract on BNB Chain...</span>
-              </div>
-            )}
-
-            {importError && (
-              <div className="mb-3 rounded-lg border border-red-900/60 bg-red-950/30 px-3 py-2 text-xs text-red-300">
-                {importError}
-              </div>
-            )}
-
-            {importedCandidate && (
-              <div className="mb-3 flex items-center justify-between rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5">
-                <div>
-                  <div className="font-mono text-sm font-semibold text-slate-100">
-                    {importedCandidate.symbol}
-                  </div>
-                  <div className="text-xs text-slate-400">
-                    {importedCandidate.name} · {importedCandidate.decimals} decimals
-                  </div>
-                </div>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+              className="cyber-chassis w-full max-w-md rounded-2xl p-5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-3.5 flex items-center justify-between border-b border-cyan-400/15 pb-3">
+                <h2 className="font-display chrome-text text-sm font-bold tracking-wider uppercase">
+                  Select or Import BEP-20 Token
+                </h2>
                 <button
                   type="button"
-                  onClick={() => handleImportAndSelect(importedCandidate)}
-                  className="inline-flex items-center gap-1 rounded bg-amber-500 px-2.5 py-1.5 text-xs font-semibold text-slate-950 hover:bg-amber-400"
+                  onClick={() => setSelectorSide(null)}
+                  className="cyber-chrome-btn rounded-md p-1.5 text-slate-300 hover:text-cyan-200"
                 >
-                  <Plus className="h-3.5 w-3.5" />
-                  <span>Import</span>
+                  <X className="h-4 w-4" />
                 </button>
               </div>
-            )}
 
-            <div className="max-h-72 divide-y divide-slate-800/60 overflow-y-auto">
-              {filteredTokens.map((t) => {
-                const isSelected =
-                  (selectorSide === 'in' && t.symbol === tokenInSymbol) ||
-                  (selectorSide === 'out' && t.symbol === tokenOutSymbol);
-                return (
-                  <button
-                    key={`${t.symbol}-${t.address}`}
-                    type="button"
-                    onClick={() => handleSelectToken(t)}
-                    className={`flex w-full items-center justify-between px-2 py-3 text-left transition-colors ${
-                      isSelected ? 'bg-amber-500/10' : 'hover:bg-slate-800/40'
-                    }`}
-                  >
+              <input
+                type="text"
+                autoFocus
+                value={tokenSearch}
+                onChange={(e) => setTokenSearch(e.target.value)}
+                placeholder="Search symbol or paste 0x BEP-20 contract..."
+                className="cyber-well mb-3.5 w-full rounded-xl px-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none"
+              />
+
+              {importingToken && (
+                <div className="cyber-well mb-3 flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs text-cyan-300">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span>Looking up BEP-20 contract on BNB Chain...</span>
+                </div>
+              )}
+
+              {importError && (
+                <div className="mb-3 rounded-xl border border-red-500/40 bg-red-950/35 px-3 py-2 text-xs text-red-200">
+                  {importError}
+                </div>
+              )}
+
+              {importedCandidate && (
+                <div className="mb-3 flex items-center justify-between rounded-xl border border-cyan-400/45 bg-cyan-500/10 px-3.5 py-2.5 shadow-[0_0_16px_rgba(0,229,255,0.16)]">
+                  <div className="flex items-center gap-3">
+                    <TokenLogo token={importedCandidate} size={30} />
                     <div>
-                      <div className="font-mono text-sm font-semibold text-slate-100">
-                        {t.symbol}
+                      <div className="font-mono text-sm font-bold text-cyan-100">
+                        {importedCandidate.symbol}
                       </div>
-                      <div className="text-xs text-slate-400">
-                        {t.name}
-                        {!t.isNative &&
-                          ` · ${t.address.slice(0, 6)}...${t.address.slice(-4)}`}
+                      <div className="text-xs text-slate-300">
+                        {importedCandidate.name} · {importedCandidate.decimals} decimals
                       </div>
                     </div>
-                    <div className="text-right font-mono text-xs text-slate-200 tabular-nums">
-                      {walletAddress
-                        ? formatDisplayAmount(balances[t.symbol] || '0')
-                        : '—'}
-                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleImportAndSelect(importedCandidate)}
+                    className="cyber-primary-btn inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-950 uppercase"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Import</span>
                   </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+                </div>
+              )}
+
+              <div className="max-h-72 divide-y divide-cyan-500/10 overflow-y-auto pr-1">
+                {filteredTokens.map((t) => {
+                  const isSelected =
+                    (selectorSide === 'in' && t.symbol === tokenInSymbol) ||
+                    (selectorSide === 'out' && t.symbol === tokenOutSymbol);
+                  return (
+                    <button
+                      key={`${t.symbol}-${t.address}`}
+                      type="button"
+                      onClick={() => handleSelectToken(t)}
+                      className={`flex w-full items-center justify-between rounded-lg px-3 py-3 text-left transition-colors ${
+                        isSelected
+                          ? 'bg-cyan-500/15 shadow-[inset_0_0_12px_rgba(0,229,255,0.12)]'
+                          : 'hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <TokenLogo token={t} size={30} />
+                        <div>
+                          <div className="font-mono text-sm font-bold text-slate-100">
+                            {t.symbol}
+                          </div>
+                          <div className="text-xs text-slate-400">
+                            {t.name}
+                            {!t.isNative &&
+                              ` · ${t.address.slice(0, 6)}...${t.address.slice(-4)}`}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right font-mono text-xs font-medium text-cyan-200 tabular-nums">
+                        {walletAddress
+                          ? formatDisplayAmount(balances[t.symbol] || '0')
+                          : '—'}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }

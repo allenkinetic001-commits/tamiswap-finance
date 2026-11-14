@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ethers } from 'ethers';
+import { AnimatePresence, motion } from 'motion/react';
 import { ExternalLink, X } from 'lucide-react';
 import { SwapWidget } from './components/SwapWidget';
 import { BSC_CHAIN_ID } from './data/swapTokens';
@@ -47,11 +48,13 @@ export default function App() {
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [walletNotice, setWalletNotice] = useState<string | null>(null);
 
+  // Discover EIP-6963 wallets asynchronously + window.trustwallet / window.ethereum
   useEffect(() => {
     const map = new Map<string, DiscoveredWallet>();
 
     const syncFromMap = () => {
-      setWallets(Array.from(map.values()));
+      const list = Array.from(map.values());
+      setWallets(list);
     };
 
     function addCandidate(id: string, name: string, provider: InjectedProvider) {
@@ -64,11 +67,7 @@ export default function App() {
     function onAnnounce(event: Event) {
       const e = event as Eip6963AnnounceEvent;
       if (e.detail?.provider && e.detail?.info) {
-        addCandidate(
-          e.detail.info.rdns || e.detail.info.uuid,
-          e.detail.info.name,
-          e.detail.provider
-        );
+        addCandidate(e.detail.info.rdns || e.detail.info.uuid, e.detail.info.name, e.detail.provider);
         syncFromMap();
       }
     }
@@ -98,6 +97,7 @@ export default function App() {
 
     syncFromMap();
 
+    // Auto-restore already-authorized session if any wallet is already unlocked & permitted
     const candidates = Array.from(map.values());
     if (candidates.length > 0) {
       (async () => {
@@ -127,6 +127,7 @@ export default function App() {
     };
   }, []);
 
+  // Subscribe to account & chain updates from the connected wallet
   useEffect(() => {
     if (!activeProvider?.on) return;
 
@@ -209,13 +210,23 @@ export default function App() {
       : '#';
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#0B0E14] text-slate-100">
-      <header className="flex h-16 items-center justify-between gap-8 border-b border-slate-800/80 px-6">
-        <div className="flex items-center gap-2.5 whitespace-nowrap shrink-0">
-          <div className="flex h-7 w-7 items-center justify-center rounded bg-amber-500 font-mono text-xs font-bold text-slate-950">
+    <div className="cyber-grid-bg relative flex min-h-screen flex-col overflow-x-hidden bg-[#030508] text-slate-100">
+      {/* Ambient electric blue & cyan volumetric glow behind central chassis */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 overflow-hidden"
+      >
+        <div className="absolute top-1/4 left-1/2 h-[460px] w-[620px] -translate-x-1/2 rounded-full bg-cyan-500/10 blur-[130px]" />
+        <div className="absolute bottom-0 left-1/2 h-[320px] w-[520px] -translate-x-1/2 rounded-full bg-blue-600/12 blur-[120px]" />
+      </div>
+
+      {/* Futuristic Top Navigation Bar */}
+      <header className="relative z-20 flex h-16 items-center justify-between gap-8 border-b border-cyan-400/20 bg-[#050811]/80 px-6 shadow-[0_1px_24px_rgba(0,229,255,0.08)] backdrop-blur-xl">
+        <div className="flex items-center gap-3 whitespace-nowrap shrink-0">
+          <div className="chrome-metal-surface flex h-8 w-8 items-center justify-center rounded-md font-display text-xs font-extrabold tracking-wider text-slate-950">
             TH
           </div>
-          <span className="font-display text-base font-semibold tracking-tight text-slate-50">
+          <span className="font-display chrome-text text-base font-bold tracking-wider uppercase">
             THENA Swap
           </span>
         </div>
@@ -230,7 +241,7 @@ export default function App() {
                 ? () => setShowWalletModal(true)
                 : handleConnectButton
             }
-            className="rounded-lg border border-slate-700/80 bg-[#111622] px-3.5 py-2 font-mono text-xs font-medium text-slate-200 whitespace-nowrap shrink-0 transition-colors hover:border-amber-500/50 hover:text-amber-300"
+            className="cyber-chrome-btn rounded-lg px-4 py-2 font-mono text-xs font-semibold tracking-wide text-cyan-100 whitespace-nowrap shrink-0"
           >
             {wrongNetwork
               ? 'Switch to BSC (56)'
@@ -241,11 +252,15 @@ export default function App() {
         </div>
       </header>
 
-      <main className="flex flex-1 flex-col items-center justify-center px-4 py-10">
+      <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 py-10">
         {walletNotice && (
-          <div className="mb-4 w-full max-w-[480px] rounded-lg border border-slate-800 bg-[#111622] px-4 py-2.5 text-center text-xs text-slate-300">
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4 w-full max-w-[480px] rounded-lg border border-cyan-400/35 bg-[#080f1d]/90 px-4 py-2.5 text-center text-xs text-cyan-100 shadow-[0_0_20px_rgba(0,229,255,0.12)] backdrop-blur-md"
+          >
             {walletNotice}
-          </div>
+          </motion.div>
         )}
         <SwapWidget
           walletAddress={walletAddress}
@@ -256,77 +271,92 @@ export default function App() {
         />
       </main>
 
-      {showWalletModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          onClick={() => setShowWalletModal(false)}
-        >
-          <div
-            className="w-full max-w-sm rounded-xl border border-slate-800 bg-[#111622] p-5"
-            onClick={(e) => e.stopPropagation()}
+      {/* Cyberpunk Wallet Selection / Connection Modal */}
+      <AnimatePresence>
+        {showWalletModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.16 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+            onClick={() => setShowWalletModal(false)}
           >
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-100">
-                {walletAddress ? 'Connected Wallet' : 'Connect DEX Wallet'}
-              </h2>
-              <button
-                type="button"
-                onClick={() => setShowWalletModal(false)}
-                className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            {walletAddress ? (
-              <div className="space-y-4">
-                <div className="rounded-lg border border-slate-800 bg-[#0B0E14] p-3.5">
-                  <div className="text-xs text-slate-400">Active Address (BNB Chain)</div>
-                  <div className="mt-1 font-mono text-xs break-all text-slate-100">
-                    {walletAddress}
-                  </div>
-                </div>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+              className="cyber-chassis w-full max-w-sm rounded-2xl p-5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-4 flex items-center justify-between border-b border-cyan-400/15 pb-3">
+                <h2 className="font-display chrome-text text-sm font-bold tracking-wider uppercase">
+                  {walletAddress ? 'Connected Wallet' : 'Connect DEX Wallet'}
+                </h2>
                 <button
                   type="button"
-                  onClick={handleDisconnect}
-                  className="w-full rounded-lg border border-red-900/60 bg-red-950/30 py-2.5 text-xs font-semibold text-red-300 hover:bg-red-950/50"
+                  onClick={() => setShowWalletModal(false)}
+                  className="cyber-chrome-btn rounded-md p-1.5 text-slate-300 hover:text-cyan-200"
                 >
-                  Disconnect Wallet
+                  <X className="h-4 w-4" />
                 </button>
               </div>
-            ) : wallets.length > 0 ? (
-              <div className="space-y-2">
-                {wallets.map((w) => (
+
+              {walletAddress ? (
+                <div className="space-y-4">
+                  <div className="cyber-well rounded-xl p-3.5">
+                    <div className="text-xs font-medium tracking-wide text-cyan-300/80 uppercase">
+                      Active Address (BNB Chain)
+                    </div>
+                    <div className="mt-1.5 font-mono text-xs break-all text-slate-100">
+                      {walletAddress}
+                    </div>
+                  </div>
                   <button
-                    key={w.id}
                     type="button"
-                    onClick={() => connectWithProvider(w.provider)}
-                    className="flex w-full items-center justify-between rounded-lg border border-slate-800 bg-[#0B0E14] px-4 py-3 text-left text-xs font-semibold text-slate-100 transition-colors hover:border-amber-500/50 hover:text-amber-300"
+                    onClick={handleDisconnect}
+                    className="w-full rounded-xl border border-red-500/45 bg-gradient-to-b from-red-950/70 to-red-950/95 py-2.5 text-xs font-semibold tracking-wide text-red-200 uppercase shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_0_16px_rgba(239,68,68,0.2)] transition-all hover:border-red-400/70 hover:text-white"
                   >
-                    <span>{w.name}</span>
-                    <span className="font-mono text-[11px] text-slate-500">Detected</span>
+                    Disconnect Wallet
                   </button>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-3 text-xs">
-                <p className="leading-relaxed text-slate-300">
-                  No browser wallet detected in this window. On mobile, open this URL directly inside Trust Wallet&apos;s built-in DApp browser, or use a desktop extension (Trust Wallet, MetaMask, Rabby).
-                </p>
-                <a
-                  href={trustDeepLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2.5 text-xs font-semibold text-slate-950 hover:bg-amber-400"
-                >
-                  <span>Open in Trust Wallet App</span>
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </a>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+                </div>
+              ) : wallets.length > 0 ? (
+                <div className="space-y-2.5">
+                  {wallets.map((w) => (
+                    <button
+                      key={w.id}
+                      type="button"
+                      onClick={() => connectWithProvider(w.provider)}
+                      className="cyber-chrome-btn flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-xs font-semibold text-slate-100"
+                    >
+                      <span className="tracking-wide">{w.name}</span>
+                      <span className="font-mono text-[11px] text-cyan-300">
+                        Detected
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-3.5 text-xs">
+                  <p className="leading-relaxed text-slate-300">
+                    No browser wallet detected in this window. On mobile, open this URL directly inside Trust Wallet&apos;s built-in DApp browser, or use a desktop extension (Trust Wallet, MetaMask, Rabby).
+                  </p>
+                  <a
+                    href={trustDeepLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="cyber-primary-btn flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-xs font-bold tracking-wide text-slate-950 uppercase"
+                  >
+                    <span>Open in Trust Wallet App</span>
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
