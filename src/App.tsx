@@ -422,11 +422,15 @@ export default function App() {
           className="energy-vein-beam pointer-events-none absolute right-0 bottom-0 left-0 h-[2px] bg-gradient-to-r from-sky-500/40 via-cyan-300 to-sky-500/40"
         />
         <div className="flex items-center gap-3 whitespace-nowrap shrink-0">
-          <div className="combat-hex-core flex h-9 w-10 items-center justify-center font-display text-xs font-extrabold tracking-wider text-white">
-            TH
-          </div>
+          <img
+            src="/assets/aistudio/tamiswap_00325eac.png"
+            alt="TamiSwap logo"
+            width={42}
+            height={40}
+            className="h-10 w-auto shrink-0 object-contain drop-shadow-[0_0_12px_rgba(0,184,255,0.85)]"
+          />
           <span className="font-display text-base font-extrabold tracking-widest uppercase whitespace-nowrap shrink-0">
-            <span className="text-white">THENA </span>
+            <span className="text-white">TAMI</span>
             <span className="text-sky-400 drop-shadow-[0_0_10px_rgba(56,189,248,0.65)]">
               SWAP
             </span>
