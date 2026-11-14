@@ -210,23 +210,60 @@ export default function App() {
       : '#';
 
   return (
-    <div className="cyber-grid-bg relative flex min-h-screen flex-col overflow-x-hidden bg-[#030508] text-slate-100">
-      {/* Ambient electric blue & cyan volumetric glow behind central chassis */}
+    <div className="combat-tech-backdrop relative flex min-h-screen flex-col overflow-x-hidden text-slate-100">
+      {/* Subtle Cybernetic Circuitry Vein Backdrop & Volumetric Cobalt Core Lighting */}
       <div
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 overflow-hidden"
       >
-        <div className="absolute top-1/4 left-1/2 h-[460px] w-[620px] -translate-x-1/2 rounded-full bg-cyan-500/10 blur-[130px]" />
-        <div className="absolute bottom-0 left-1/2 h-[320px] w-[520px] -translate-x-1/2 rounded-full bg-blue-600/12 blur-[120px]" />
+        <svg
+          className="absolute inset-0 h-full w-full opacity-[0.14]"
+          xmlns="http://www.w3.org/2000/svg"
+          preserveAspectRatio="none"
+          viewBox="0 0 1440 900"
+        >
+          <defs>
+            <linearGradient id="vein-h" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#0066ff" stopOpacity="0" />
+              <stop offset="35%" stopColor="#00aaff" stopOpacity="0.85" />
+              <stop offset="50%" stopColor="#38bdf8" stopOpacity="1" />
+              <stop offset="65%" stopColor="#00aaff" stopOpacity="0.85" />
+              <stop offset="100%" stopColor="#0066ff" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          {/* Symmetrical angular cybernetic armor trace lines */}
+          <path
+            d="M0 240 L260 240 L320 300 L520 300 M1440 240 L1180 240 L1120 300 L920 300"
+            stroke="url(#vein-h)"
+            strokeWidth="1.25"
+            fill="none"
+          />
+          <path
+            d="M0 640 L220 640 L290 570 L490 570 M1440 640 L1220 640 L1150 570 L950 570"
+            stroke="url(#vein-h)"
+            strokeWidth="1.25"
+            fill="none"
+          />
+          <circle cx="520" cy="300" r="3" fill="#38bdf8" />
+          <circle cx="920" cy="300" r="3" fill="#38bdf8" />
+          <circle cx="490" cy="570" r="3" fill="#00e5ff" />
+          <circle cx="950" cy="570" r="3" fill="#00e5ff" />
+        </svg>
+        <div className="energy-vein-glow absolute top-1/4 left-1/2 h-[460px] w-[660px] -translate-x-1/2 rounded-full bg-sky-500/14 blur-[135px]" />
+        <div className="absolute bottom-0 left-1/2 h-[320px] w-[540px] -translate-x-1/2 rounded-full bg-blue-700/16 blur-[125px]" />
       </div>
 
-      {/* Futuristic Top Navigation Bar */}
-      <header className="relative z-20 flex h-16 items-center justify-between gap-8 border-b border-cyan-400/20 bg-[#050811]/80 px-6 shadow-[0_1px_24px_rgba(0,229,255,0.08)] backdrop-blur-xl">
+      {/* Armored Top Navigation Bar */}
+      <header className="combat-topbar relative z-20 flex h-16 items-center justify-between gap-8 px-6">
+        <div
+          aria-hidden="true"
+          className="energy-vein-beam pointer-events-none absolute right-0 bottom-0 left-0 h-[1.5px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent"
+        />
         <div className="flex items-center gap-3 whitespace-nowrap shrink-0">
-          <div className="chrome-metal-surface flex h-8 w-8 items-center justify-center rounded-md font-display text-xs font-extrabold tracking-wider text-slate-950">
+          <div className="chrome-armor-plate flex h-9 w-9 items-center justify-center font-display text-xs font-extrabold tracking-wider text-slate-950">
             TH
           </div>
-          <span className="font-display chrome-text text-base font-bold tracking-wider uppercase">
+          <span className="font-display chrome-text text-base font-bold tracking-widest uppercase">
             THENA Swap
           </span>
         </div>
@@ -241,7 +278,7 @@ export default function App() {
                 ? () => setShowWalletModal(true)
                 : handleConnectButton
             }
-            className="cyber-chrome-btn rounded-lg px-4 py-2 font-mono text-xs font-semibold tracking-wide text-cyan-100 whitespace-nowrap shrink-0"
+            className="combat-steel-btn px-4 py-2 font-mono text-xs font-semibold tracking-wider text-cyan-100 whitespace-nowrap shrink-0"
           >
             {wrongNetwork
               ? 'Switch to BSC (56)'
@@ -257,9 +294,13 @@ export default function App() {
           <motion.div
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-4 w-full max-w-[480px] rounded-lg border border-cyan-400/35 bg-[#080f1d]/90 px-4 py-2.5 text-center text-xs text-cyan-100 shadow-[0_0_20px_rgba(0,229,255,0.12)] backdrop-blur-md"
+            className="armor-chassis-shell mb-4 w-full max-w-[480px]"
           >
-            {walletNotice}
+            <div className="armor-well-rim">
+              <div className="armor-well px-4 py-2.5 text-center text-xs text-cyan-100">
+                {walletNotice}
+              </div>
+            </div>
           </motion.div>
         )}
         <SwapWidget
@@ -271,7 +312,7 @@ export default function App() {
         />
       </main>
 
-      {/* Cyberpunk Wallet Selection / Connection Modal */}
+      {/* Cybernetic Wallet Selection / Connection Modal */}
       <AnimatePresence>
         {showWalletModal && (
           <motion.div
@@ -279,7 +320,7 @@ export default function App() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.16 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#010308]/85 p-4 backdrop-blur-md"
             onClick={() => setShowWalletModal(false)}
           >
             <motion.div
@@ -287,72 +328,82 @@ export default function App() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 8 }}
               transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-              className="cyber-chassis w-full max-w-sm rounded-2xl p-5"
+              className="armor-chassis-shell w-full max-w-sm"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="mb-4 flex items-center justify-between border-b border-cyan-400/15 pb-3">
-                <h2 className="font-display chrome-text text-sm font-bold tracking-wider uppercase">
-                  {walletAddress ? 'Connected Wallet' : 'Connect DEX Wallet'}
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setShowWalletModal(false)}
-                  className="cyber-chrome-btn rounded-md p-1.5 text-slate-300 hover:text-cyan-200"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              {walletAddress ? (
-                <div className="space-y-4">
-                  <div className="cyber-well rounded-xl p-3.5">
-                    <div className="text-xs font-medium tracking-wide text-cyan-300/80 uppercase">
-                      Active Address (BNB Chain)
-                    </div>
-                    <div className="mt-1.5 font-mono text-xs break-all text-slate-100">
-                      {walletAddress}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleDisconnect}
-                    className="w-full rounded-xl border border-red-500/45 bg-gradient-to-b from-red-950/70 to-red-950/95 py-2.5 text-xs font-semibold tracking-wide text-red-200 uppercase shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_0_16px_rgba(239,68,68,0.2)] transition-all hover:border-red-400/70 hover:text-white"
-                  >
-                    Disconnect Wallet
-                  </button>
-                </div>
-              ) : wallets.length > 0 ? (
-                <div className="space-y-2.5">
-                  {wallets.map((w) => (
+              <div className="armor-chassis-rim">
+                <div className="armor-chassis relative p-5">
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute top-0 right-6 left-6 h-[1.5px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent"
+                  />
+                  <div className="mb-4 flex items-center justify-between border-b border-sky-400/20 pb-3">
+                    <h2 className="font-display chrome-text text-sm font-bold tracking-widest uppercase">
+                      {walletAddress ? 'Connected Wallet' : 'Connect DEX Wallet'}
+                    </h2>
                     <button
-                      key={w.id}
                       type="button"
-                      onClick={() => connectWithProvider(w.provider)}
-                      className="cyber-chrome-btn flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-xs font-semibold text-slate-100"
+                      onClick={() => setShowWalletModal(false)}
+                      className="combat-steel-btn p-1.5 text-slate-300 hover:text-cyan-200"
                     >
-                      <span className="tracking-wide">{w.name}</span>
-                      <span className="font-mono text-[11px] text-cyan-300">
-                        Detected
-                      </span>
+                      <X className="h-4 w-4" />
                     </button>
-                  ))}
+                  </div>
+
+                  {walletAddress ? (
+                    <div className="space-y-4">
+                      <div className="armor-well-rim">
+                        <div className="armor-well p-3.5">
+                          <div className="text-xs font-semibold tracking-wider text-sky-300 uppercase">
+                            Active Address (BNB Chain)
+                          </div>
+                          <div className="mt-1.5 font-mono text-xs break-all text-slate-100">
+                            {walletAddress}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleDisconnect}
+                        className="combat-steel-btn w-full border-red-500/55 py-2.5 text-xs font-bold tracking-wider text-red-200 uppercase hover:border-red-400 hover:text-white"
+                      >
+                        Disconnect Wallet
+                      </button>
+                    </div>
+                  ) : wallets.length > 0 ? (
+                    <div className="space-y-2.5">
+                      {wallets.map((w) => (
+                        <button
+                          key={w.id}
+                          type="button"
+                          onClick={() => connectWithProvider(w.provider)}
+                          className="combat-steel-btn flex w-full items-center justify-between px-4 py-3 text-left text-xs font-semibold text-slate-100"
+                        >
+                          <span className="tracking-wide">{w.name}</span>
+                          <span className="font-mono text-[11px] text-cyan-300">
+                            Detected
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-3.5 text-xs">
+                      <p className="leading-relaxed text-slate-300">
+                        No browser wallet detected in this window. On mobile, open this URL directly inside Trust Wallet&apos;s built-in DApp browser, or use a desktop extension (Trust Wallet, MetaMask, Rabby).
+                      </p>
+                      <a
+                        href={trustDeepLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="combat-energy-btn flex w-full items-center justify-center gap-2 px-4 py-3 font-display text-xs font-bold tracking-wider text-white uppercase drop-shadow-[0_1px_2px_rgba(2,6,23,0.9)]"
+                      >
+                        <span>Open in Trust Wallet App</span>
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="space-y-3.5 text-xs">
-                  <p className="leading-relaxed text-slate-300">
-                    No browser wallet detected in this window. On mobile, open this URL directly inside Trust Wallet&apos;s built-in DApp browser, or use a desktop extension (Trust Wallet, MetaMask, Rabby).
-                  </p>
-                  <a
-                    href={trustDeepLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="cyber-primary-btn flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-xs font-bold tracking-wide text-slate-950 uppercase"
-                  >
-                    <span>Open in Trust Wallet App</span>
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
-                </div>
-              )}
+              </div>
             </motion.div>
           </motion.div>
         )}

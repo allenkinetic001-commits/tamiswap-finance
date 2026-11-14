@@ -6,12 +6,44 @@
     --font-display: 'Orbitron', sans-serif;
     --font-sans: 'Chakra Petch', -apple-system, BlinkMacSystemFont, sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    /* Chamfered armor clip paths */
+    --clip-armor-lg: polygon(
+      18px 0,
+      calc(100% - 18px) 0,
+      100% 18px,
+      100% calc(100% - 18px),
+      calc(100% - 18px) 100%,
+      18px 100%,
+      0 calc(100% - 18px),
+      0 18px
+    );
+    --clip-armor-md: polygon(
+      12px 0,
+      calc(100% - 12px) 0,
+      100% 12px,
+      100% calc(100% - 12px),
+      calc(100% - 12px) 100%,
+      12px 100%,
+      0 calc(100% - 12px),
+      0 12px
+    );
+    --clip-armor-sm: polygon(
+      8px 0,
+      calc(100% - 8px) 0,
+      100% 8px,
+      100% calc(100% - 8px),
+      calc(100% - 8px) 100%,
+      8px 100%,
+      0 calc(100% - 8px),
+      0 8px
+    );
   }
 
   body {
     font-family: var(--font-sans);
-    background-color: #030508;
-    color: #e2e8f0;
+    background-color: #02040a;
+    color: #e6f0ff;
   }
 
   h1, h2, h3, h4, .font-display {
@@ -27,175 +59,277 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Deep cyberpunk spatial grid backdrop */
-.cyber-grid-bg {
+/* Deep midnight-black & navy cybernetic circuitry canvas */
+.combat-tech-backdrop {
+  background-color: #02040a;
   background-image:
-    radial-gradient(circle at 50% 0%, rgba(0, 229, 255, 0.12) 0%, rgba(37, 99, 235, 0.05) 36%, transparent 70%),
-    linear-gradient(to right, rgba(0, 229, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(0, 229, 255, 0.035) 1px, transparent 1px);
-  background-size: 100% 100%, 44px 44px, 44px 44px;
-  background-position: 0 0, center center, center center;
+    radial-gradient(ellipse 75% 55% at 50% 18%, rgba(0, 128, 255, 0.14) 0%, rgba(4, 16, 42, 0.45) 48%, rgba(2, 4, 10, 0.98) 100%),
+    linear-gradient(135deg, rgba(0, 180, 255, 0.03) 25%, transparent 25%),
+    linear-gradient(225deg, rgba(0, 180, 255, 0.03) 25%, transparent 25%),
+    linear-gradient(to right, rgba(14, 165, 233, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(14, 165, 233, 0.045) 1px, transparent 1px);
+  background-size: 100% 100%, 72px 72px, 72px 72px, 48px 48px, 48px 48px;
+  background-position: 0 0, 0 0, 0 0, center center, center center;
 }
 
-/* Chrome silver metallic emblem & text gradient */
-.chrome-metal-surface {
+/* Machined brushed-steel header bar */
+.combat-topbar {
   background: linear-gradient(
-    145deg,
-    #ffffff 0%,
-    #cbd5e1 28%,
-    #64748b 52%,
-    #e2e8f0 78%,
-    #94a3b8 100%
+    180deg,
+    rgba(11, 20, 38, 0.94) 0%,
+    rgba(4, 9, 20, 0.96) 100%
   );
+  border-bottom: 1px solid rgba(56, 189, 248, 0.3);
+  box-shadow:
+    0 12px 32px -8px rgba(0, 0, 0, 0.9),
+    0 1px 22px rgba(0, 162, 255, 0.18),
+    inset 0 1px 0 rgba(203, 238, 255, 0.14);
+  backdrop-filter: blur(18px);
+}
+
+/* Chrome / brushed-titanium surface */
+.chrome-armor-plate {
+  clip-path: var(--clip-armor-sm);
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.06) 0px,
+      rgba(255, 255, 255, 0.06) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    linear-gradient(
+      145deg,
+      #f8fafc 0%,
+      #cbd5e1 24%,
+      #475569 52%,
+      #e2e8f0 78%,
+      #64748b 100%
+    );
   box-shadow:
     inset 0 1px 1px rgba(255, 255, 255, 0.9),
-    inset 0 -2px 3px rgba(15, 23, 42, 0.7),
-    0 0 18px rgba(0, 229, 255, 0.35);
+    inset 0 -2px 3px rgba(2, 6, 23, 0.75);
 }
 
 .chrome-text {
-  background: linear-gradient(180deg, #ffffff 0%, #cbd5e1 55%, #7dd3fc 100%);
+  background: linear-gradient(180deg, #ffffff 0%, #dbeafe 48%, #38bdf8 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
-/* Glossy 3D obsidian chassis with cyan/blue neon rim */
-.cyber-chassis {
+/* Outer drop-shadow wrapper for chamfered chassis */
+.armor-chassis-shell {
+  filter:
+    drop-shadow(0 28px 50px rgba(0, 0, 0, 0.92))
+    drop-shadow(0 0 26px rgba(0, 153, 255, 0.22));
+}
+
+/* Angular brushed-steel dark glass armor chassis */
+.armor-chassis {
+  clip-path: var(--clip-armor-lg);
+  background:
+    repeating-linear-gradient(
+      180deg,
+      rgba(148, 163, 184, 0.022) 0px,
+      rgba(148, 163, 184, 0.022) 1px,
+      transparent 1px,
+      transparent 4px
+    ),
+    linear-gradient(
+      165deg,
+      rgba(15, 28, 52, 0.96) 0%,
+      rgba(7, 13, 27, 0.98) 46%,
+      rgba(3, 7, 16, 0.99) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(191, 219, 254, 0.22),
+    inset 0 -1px 0 rgba(0, 180, 255, 0.25);
+  backdrop-filter: blur(22px);
+}
+
+/* Armored perimeter frame with luminous cyan/electric-blue bevel */
+.armor-chassis-rim {
+  clip-path: var(--clip-armor-lg);
+  padding: 1.5px;
+  background: linear-gradient(
+    145deg,
+    rgba(125, 211, 252, 0.75) 0%,
+    rgba(0, 119, 255, 0.45) 28%,
+    rgba(30, 58, 138, 0.35) 55%,
+    rgba(0, 229, 255, 0.75) 85%,
+    rgba(56, 189, 248, 0.45) 100%
+  );
+}
+
+/* Recessed cybernetic chamber / input well */
+.armor-well-rim {
+  clip-path: var(--clip-armor-md);
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    rgba(56, 189, 248, 0.35) 0%,
+    rgba(15, 36, 74, 0.65) 50%,
+    rgba(0, 229, 255, 0.32) 100%
+  );
+  transition: background 180ms ease, filter 180ms ease;
+}
+
+.armor-well-rim:focus-within {
+  background: linear-gradient(
+    135deg,
+    rgba(0, 229, 255, 0.9) 0%,
+    rgba(37, 99, 235, 0.75) 50%,
+    rgba(56, 189, 248, 0.9) 100%
+  );
+  filter: drop-shadow(0 0 12px rgba(0, 200, 255, 0.28));
+}
+
+.armor-well {
+  clip-path: var(--clip-armor-md);
   background: linear-gradient(
     180deg,
-    rgba(13, 21, 36, 0.94) 0%,
-    rgba(6, 10, 19, 0.97) 100%
+    rgba(2, 6, 15, 0.97) 0%,
+    rgba(7, 14, 30, 0.94) 100%
   );
-  border: 1px solid rgba(56, 189, 248, 0.28);
   box-shadow:
-    0 24px 60px -15px rgba(0, 0, 0, 0.9),
-    0 0 36px -8px rgba(0, 229, 255, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    inset 0 -1px 0 rgba(0, 229, 255, 0.12);
-  backdrop-filter: blur(20px);
+    inset 0 4px 14px rgba(0, 0, 0, 0.9),
+    inset 0 1px 0 rgba(56, 189, 248, 0.08);
 }
 
-/* Recessed 3D glossy input well */
-.cyber-well {
-  background: linear-gradient(
-    180deg,
-    rgba(3, 6, 13, 0.95) 0%,
-    rgba(8, 13, 25, 0.9) 100%
-  );
-  border: 1px solid rgba(56, 189, 248, 0.18);
-  box-shadow:
-    inset 0 3px 12px rgba(0, 0, 0, 0.85),
-    inset 0 1px 0 rgba(0, 229, 255, 0.06);
-  transition: border-color 180ms ease, box-shadow 180ms ease;
-}
-
-.cyber-well:focus-within {
-  border-color: rgba(0, 229, 255, 0.58);
-  box-shadow:
-    inset 0 3px 12px rgba(0, 0, 0, 0.85),
-    0 0 18px rgba(0, 229, 255, 0.18);
-}
-
-/* Chrome-trimmed 3D token selector & secondary buttons */
-.cyber-chrome-btn {
-  background: linear-gradient(
-    180deg,
-    rgba(30, 41, 59, 0.92) 0%,
-    rgba(15, 23, 42, 0.96) 52%,
-    rgba(9, 14, 26, 0.98) 100%
-  );
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.24),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.7),
-    0 4px 12px rgba(0, 0, 0, 0.5);
-  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), border-color 160ms ease, box-shadow 160ms ease;
-}
-
-.cyber-chrome-btn:hover {
-  border-color: rgba(0, 229, 255, 0.65);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.34),
-    0 0 16px rgba(0, 229, 255, 0.26);
-  transform: translateY(-1px);
-}
-
-.cyber-chrome-btn:active {
-  transform: translateY(1px);
-}
-
-/* Glossy 3D Electric Blue / Cyan Primary CTA */
-.cyber-primary-btn {
+/* Glossy 3D metallic brushed-steel button with electric-blue outline */
+.combat-steel-btn {
   position: relative;
-  overflow: hidden;
-  background: linear-gradient(
-    180deg,
-    #38bdf8 0%,
-    #0284c7 48%,
-    #1d4ed8 100%
-  );
-  border: 1px solid rgba(125, 211, 252, 0.65);
+  clip-path: var(--clip-armor-sm);
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.025) 0px,
+      rgba(255, 255, 255, 0.025) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    linear-gradient(
+      180deg,
+      #27364f 0%,
+      #141e33 48%,
+      #090f1d 100%
+    );
+  border: 1px solid rgba(56, 189, 248, 0.48);
   box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.55),
-    inset 0 -2px 4px rgba(15, 23, 42, 0.55),
-    0 8px 24px -4px rgba(0, 229, 255, 0.42),
-    0 0 14px rgba(37, 99, 235, 0.35);
-  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 180ms ease, filter 180ms ease;
+    inset 0 1px 0 rgba(226, 232, 240, 0.35),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.75),
+    0 4px 12px rgba(0, 0, 0, 0.55);
+  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), border-color 160ms ease, box-shadow 160ms ease, filter 160ms ease;
 }
 
-.cyber-primary-btn::before {
+.combat-steel-btn::before {
   content: '';
   position: absolute;
-  inset: 0 0 50% 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0) 100%);
+  inset: 0 0 52% 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0) 100%);
   pointer-events: none;
 }
 
-.cyber-primary-btn:hover:not(:disabled) {
-  filter: brightness(1.08);
+.combat-steel-btn:hover:not(:disabled) {
+  border-color: rgba(0, 229, 255, 0.9);
   box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.7),
-    inset 0 -2px 4px rgba(15, 23, 42, 0.5),
-    0 10px 28px -2px rgba(0, 229, 255, 0.58),
-    0 0 22px rgba(59, 130, 246, 0.45);
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    0 0 16px rgba(0, 204, 255, 0.34);
+  filter: brightness(1.08);
   transform: translateY(-1px);
 }
 
-.cyber-primary-btn:active:not(:disabled) {
+.combat-steel-btn:active:not(:disabled) {
   transform: translateY(1px);
 }
 
-.cyber-primary-btn:disabled {
-  background: linear-gradient(180deg, #161f30 0%, #0d1320 100%);
-  border-color: rgba(71, 85, 105, 0.35);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+/* Glossy 3D Electric-Blue Cybernetic Primary CTA */
+.combat-energy-btn {
+  position: relative;
+  overflow: hidden;
+  clip-path: var(--clip-armor-md);
+  background: linear-gradient(
+    180deg,
+    #38bdf8 0%,
+    #0284c7 42%,
+    #0047b3 100%
+  );
+  border: 1px solid rgba(103, 232, 249, 0.85);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.65),
+    inset 0 -3px 6px rgba(2, 6, 23, 0.6),
+    0 0 24px rgba(0, 174, 255, 0.45);
+  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 180ms ease, filter 180ms ease;
 }
 
-@keyframes neon-scan {
+.combat-energy-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 52% 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0) 100%);
+  pointer-events: none;
+}
+
+.combat-energy-btn:hover:not(:disabled) {
+  filter: brightness(1.1);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.8),
+    inset 0 -3px 6px rgba(2, 6, 23, 0.55),
+    0 0 32px rgba(0, 229, 255, 0.62);
+  transform: translateY(-1px);
+}
+
+.combat-energy-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.combat-energy-btn:disabled {
+  background: linear-gradient(180deg, #162033 0%, #0b1120 100%);
+  border-color: rgba(51, 65, 85, 0.6);
+  box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.1);
+}
+
+/* Illuminated horizontal & vertical electric-blue energy veins */
+@keyframes vein-surge {
   0% {
-    opacity: 0.35;
+    opacity: 0.25;
     transform: translateX(-100%);
   }
   50% {
-    opacity: 0.75;
+    opacity: 0.95;
   }
   100% {
-    opacity: 0.35;
+    opacity: 0.25;
     transform: translateX(100%);
   }
 }
 
-.cyber-top-beam {
-  animation: neon-scan 7s ease-in-out infinite;
+@keyframes core-pulse {
+  0%, 100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.energy-vein-beam {
+  animation: vein-surge 4.8s ease-in-out infinite;
+}
+
+.energy-vein-glow {
+  animation: core-pulse 3.4s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cyber-top-beam {
+  .energy-vein-beam,
+  .energy-vein-glow {
     animation: none;
   }
-  .cyber-chrome-btn,
-  .cyber-primary-btn {
+  .combat-steel-btn,
+  .combat-energy-btn,
+  .armor-well-rim {
     transition: none;
   }
 }
@@ -211,10 +345,10 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(56, 189, 248, 0.25);
-  border-radius: 3px;
+  background: rgba(56, 189, 248, 0.3);
+  border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 229, 255, 0.48);
+  background: rgba(0, 229, 255, 0.58);
 }
