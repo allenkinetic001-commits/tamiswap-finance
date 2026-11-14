@@ -416,20 +416,26 @@ export default function App() {
       </div>
 
       {/* Stepped Armored Top Navigation Bar */}
-      <header className="combat-topbar relative z-20 flex h-16 items-center justify-between gap-8 px-4 sm:px-6">
+      <header className="combat-topbar relative z-20 flex h-20 items-center justify-between gap-6 px-4 sm:px-6">
         <div
           aria-hidden="true"
           className="energy-vein-beam pointer-events-none absolute right-0 bottom-0 left-0 h-[2px] bg-gradient-to-r from-sky-500/40 via-cyan-300 to-sky-500/40"
         />
-        <div className="flex items-center gap-3 whitespace-nowrap shrink-0">
-          <img
-            src="/assets/aistudio/tamiswap_00325eac.png"
-            alt="TamiSwap logo"
-            width={42}
-            height={40}
-            className="h-10 w-auto shrink-0 object-contain drop-shadow-[0_0_12px_rgba(0,184,255,0.85)]"
-          />
-          <span className="font-display text-base font-extrabold tracking-widest uppercase whitespace-nowrap shrink-0">
+        <div className="flex items-center gap-3.5 whitespace-nowrap shrink-0">
+          <div className="relative flex h-14 w-15 sm:h-16 sm:w-17 shrink-0 items-center justify-center">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-1 rounded-full bg-sky-400/25 blur-md"
+            />
+            <img
+              src="/assets/aistudio/tamiswap_00325eac.png"
+              alt="TamiSwap logo"
+              width={68}
+              height={64}
+              className="relative z-10 h-14 w-auto sm:h-16 object-contain [image-rendering:-webkit-optimize-contrast]"
+            />
+          </div>
+          <span className="font-display text-lg sm:text-xl font-extrabold tracking-widest uppercase whitespace-nowrap shrink-0">
             <span className="text-white">TAMI</span>
             <span className="text-sky-400 drop-shadow-[0_0_10px_rgba(56,189,248,0.65)]">
               SWAP
