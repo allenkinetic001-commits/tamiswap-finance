@@ -53,6 +53,22 @@ function formatUpdatedTime(ts: number | null): string {
   });
 }
 
+function TrendTriangle({ isUp }: { isUp: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 10 8"
+      className="h-2.5 w-2.5 shrink-0 fill-current"
+    >
+      {isUp ? (
+        <polygon points="5,0 10,8 0,8" />
+      ) : (
+        <polygon points="0,0 10,0 5,8" />
+      )}
+    </svg>
+  );
+}
+
 export function TopTokensView({
   onSelectTokenForSwap,
   isRedMode = false,
@@ -298,11 +314,11 @@ export function TopTokensView({
                               </td>
                               <td className="py-3 px-2 text-right font-mono text-sm font-bold tabular-nums">
                                 <span
-                                  className={`inline-flex items-center justify-end gap-1 ${
+                                  className={`inline-flex items-center justify-end gap-1.5 ${
                                     isUp ? 'text-emerald-400' : 'text-red-400'
                                   }`}
                                 >
-                                  <span aria-hidden="true">{isUp ? '↑' : '↓'}</span>
+                                  <TrendTriangle isUp={isUp} />
                                   <span>
                                     {isUp ? '+' : ''}
                                     {token.change24hPct.toFixed(2)}%
@@ -370,13 +386,15 @@ export function TopTokensView({
                               {formatUsdPrice(token.priceUsd)}
                             </div>
                             <div
-                              className={`text-xs font-bold ${
+                              className={`inline-flex items-center justify-end gap-1 text-xs font-bold ${
                                 isUp ? 'text-emerald-400' : 'text-red-400'
                               }`}
                             >
-                              <span aria-hidden="true">{isUp ? '↑' : '↓'}</span>{' '}
-                              {isUp ? '+' : ''}
-                              {token.change24hPct.toFixed(2)}%
+                              <TrendTriangle isUp={isUp} />
+                              <span>
+                                {isUp ? '+' : ''}
+                                {token.change24hPct.toFixed(2)}%
+                              </span>
                             </div>
                           </div>
                         </button>
