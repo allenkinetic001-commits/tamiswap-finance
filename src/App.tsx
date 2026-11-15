@@ -482,7 +482,7 @@ export default function App() {
               : 'from-sky-500/40 via-cyan-300 to-sky-500/40'
           }`}
         />
-        <div className="flex min-w-0 items-center gap-1 sm:gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-3">
           <div className="relative flex h-13 w-13 sm:h-16 sm:w-17 shrink-0 items-center justify-center">
             <div
               aria-hidden="true"
@@ -515,7 +515,7 @@ export default function App() {
               alt="TamiSwap"
               width={180}
               height={60}
-              className={`relative z-10 h-auto max-h-5.5 w-full max-w-[68px] sm:h-11 sm:max-h-none sm:w-auto sm:max-w-none object-contain drop-shadow-[0_0_12px_rgba(0,180,255,0.45)] [image-rendering:-webkit-optimize-contrast] transition-opacity duration-150 ${
+              className={`relative z-10 h-9 w-auto max-w-full sm:h-14 sm:max-w-none object-contain object-left drop-shadow-[0_0_12px_rgba(0,180,255,0.45)] [image-rendering:-webkit-optimize-contrast] transition-opacity duration-150 ${
                 isRedMode ? 'opacity-0 pointer-events-none' : 'opacity-100'
               }`}
             />
@@ -524,7 +524,7 @@ export default function App() {
               alt="TamiSwap red mode"
               width={180}
               height={60}
-              className={`absolute inset-0 z-10 h-full w-full object-contain drop-shadow-[0_0_12px_rgba(255,34,58,0.5)] [image-rendering:-webkit-optimize-contrast] transition-opacity duration-150 ${
+              className={`absolute inset-0 z-10 h-full w-full object-contain object-left drop-shadow-[0_0_12px_rgba(255,34,58,0.5)] [image-rendering:-webkit-optimize-contrast] transition-opacity duration-150 ${
                 isRedMode ? 'opacity-100' : 'opacity-0 pointer-events-none'
               }`}
             />
