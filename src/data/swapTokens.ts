@@ -20,6 +20,9 @@ export const WBNB_ADDRESS = '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c';
 export const USDT_ADDRESS = '0x55d398326f99059fF775485246999027B3197955';
 export const PLATFORM_FEE_BPS = 25;
 export const PLATFORM_FEE_RECIPIENT = '0xcd4BDDeae498c7E303C153921b03da4b83FE846c';
+export const TAMI_FEE_ROUTER_ADDRESS =
+  ((import.meta as unknown as { env?: Record<string, string | undefined> }).env
+    ?.VITE_FEE_ROUTER_ADDRESS || '').trim();
 
 export const BSC_RPC_URLS = [
   'https://bsc-dataseed1.binance.org',

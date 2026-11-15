@@ -8,6 +8,7 @@ import {
   PLATFORM_FEE_BPS,
   PLATFORM_FEE_RECIPIENT,
   SwapToken,
+  TAMI_FEE_ROUTER_ADDRESS,
   THENA_PAIR_FACTORY_ADDRESS,
   THENA_ROUTER_V2_ADDRESS,
   USDT_ADDRESS,
@@ -66,6 +67,7 @@ export interface OnChainQuote {
   platformFeeRecipient: string;
   pairAddress: string | null;
   isWrapOrUnwrap: boolean;
+  useFeeWrapper?: boolean;
   kyberRouteSummary?: KyberRouteSummary;
 }
 
@@ -218,6 +220,22 @@ const PAIR_ABI = [
   'function getReserves() view returns (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast)',
   'function token0() view returns (address)',
 ];
+
+const TAMI_FEE_ROUTER_ABI = [
+  'function swapExactETHForTokensOnPancake(uint256 amountOutMin, address[] path, address to, uint256 deadline) payable',
+  'function swapExactTokensForETHOnPancake(uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline)',
+  'function swapExactTokensForTokensOnPancake(uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline)',
+  'function swapExactETHForTokensOnThena(uint256 amountOutMin, (address from, address to, bool stable)[] routes, address to, uint256 deadline) payable',
+  'function swapExactTokensForETHOnThena(uint256 amountIn, uint256 amountOutMin, (address from, address to, bool stable)[] routes, address to, uint256 deadline)',
+  'function swapExactTokensForTokensOnThena(uint256 amountIn, uint256 amountOutMin, (address from, address to, bool stable)[] routes, address to, uint256 deadline)',
+];
+
+function getConfiguredFeeWrapperAddress(): string | null {
+  if (!TAMI_FEE_ROUTER_ADDRESS || !ethers.isAddress(TAMI_FEE_ROUTER_ADDRESS)) {
+    return null;
+  }
+  return ethers.getAddress(TAMI_FEE_ROUTER_ADDRESS);
+}
 
 let cachedReadProvider: ethers.JsonRpcProvider | null = null;
 
@@ -417,6 +435,11 @@ export async function fetchOnChainQuote(params: {
     }
   }
 
+  const feeWrapperAddress = getConfiguredFeeWrapperAddress();
+  const platformFeeWei = (amountInWei * BigInt(PLATFORM_FEE_BPS)) / 10000n;
+  const effectiveInWei = amountInWei - platformFeeWei;
+  if (effectiveInWei <= 0n) return null;
+
   type QuoteCandidate =
     | { dex: 'thena'; routes: RouteHop[]; pancakePath: string[]; outWei: bigint }
     | { dex: 'pancakeswap'; routes: RouteHop[]; pancakePath: string[]; outWei: bigint };
@@ -425,7 +448,7 @@ export async function fetchOnChainQuote(params: {
     Promise.all(
       thenaCandidateRoutes.map(async (routes): Promise<QuoteCandidate | null> => {
         try {
-          const amounts = (await thenaRouter.getAmountsOut(amountInWei, routes)) as bigint[];
+          const amounts = (await thenaRouter.getAmountsOut(effectiveInWei, routes)) as bigint[];
           const outWei = amounts[amounts.length - 1];
           if (outWei <= 0n) return null;
           return { dex: 'thena', routes, pancakePath: [], outWei };
@@ -437,7 +460,7 @@ export async function fetchOnChainQuote(params: {
     Promise.all(
       pancakeCandidatePaths.map(async (path): Promise<QuoteCandidate | null> => {
         try {
-          const amounts = (await pancakeRouter.getAmountsOut(amountInWei, path)) as bigint[];
+          const amounts = (await pancakeRouter.getAmountsOut(effectiveInWei, path)) as bigint[];
           const outWei = amounts[amounts.length - 1];
           if (outWei <= 0n) return null;
           return { dex: 'pancakeswap', routes: [], pancakePath: path, outWei };
@@ -529,8 +552,12 @@ export async function fetchOnChainQuote(params: {
     // Non-fatal metadata lookup
   }
 
-  if (kyberFeeQuote) {
-    const outWei = BigInt(kyberFeeQuote.routeSummary.amountOut);
+  const kyberOutWei = kyberFeeQuote ? BigInt(kyberFeeQuote.routeSummary.amountOut) : 0n;
+  const shouldPreferWrapper =
+    Boolean(feeWrapperAddress && best) && (!kyberFeeQuote || (best && best.outWei >= kyberOutWei));
+
+  if (kyberFeeQuote && !shouldPreferWrapper) {
+    const outWei = kyberOutWei;
     const { dex, dexLabel } = summarizeKyberExchanges(kyberFeeQuote.routeSummary.route);
     const primaryBranch = kyberFeeQuote.routeSummary.route[0] || [];
     const kyberSymbols = [tokenIn.symbol];
@@ -548,7 +575,6 @@ export async function fetchOnChainQuote(params: {
     }
     if (kyberSymbols.length === 1) kyberSymbols.push(tokenOut.symbol);
 
-    const platformFeeWei = (amountInWei * BigInt(PLATFORM_FEE_BPS)) / 10000n;
     return {
       dex,
       dexLabel,
@@ -567,6 +593,12 @@ export async function fetchOnChainQuote(params: {
       isWrapOrUnwrap: false,
       kyberRouteSummary: kyberFeeQuote.routeSummary,
     };
+  }
+
+  if (!feeWrapperAddress || !best) {
+    throw new Error(
+      '0.25% platform fee enforcement active: deploy TamiSwapFeeRouter (VITE_FEE_ROUTER_ADDRESS) to route unindexed BEP-20 tokens directly through THENA/PancakeSwap with your platform fee.'
+    );
   }
 
   const routeSymbols = [tokenIn.symbol];
@@ -593,8 +625,7 @@ export async function fetchOnChainQuote(params: {
   return {
     dex: best.dex,
     dexLabel: best.dex === 'pancakeswap' ? 'PancakeSwap V2' : 'THENA RouterV2',
-    routerAddress:
-      best.dex === 'pancakeswap' ? PANCAKE_ROUTER_V2_ADDRESS : THENA_ROUTER_V2_ADDRESS,
+    routerAddress: feeWrapperAddress,
     amountOutWei: best.outWei,
     amountOutFormatted: ethers.formatUnits(best.outWei, tokenOut.decimals),
     routes: best.routes,
@@ -602,11 +633,12 @@ export async function fetchOnChainQuote(params: {
     routeSymbols,
     priceImpactPct,
     feeBps,
-    platformFeeBps: 0,
-    platformFeeWei: 0n,
+    platformFeeBps: PLATFORM_FEE_BPS,
+    platformFeeWei,
     platformFeeRecipient: PLATFORM_FEE_RECIPIENT,
     pairAddress,
     isWrapOrUnwrap: false,
+    useFeeWrapper: true,
   };
 }
 
@@ -697,25 +729,33 @@ export async function executeOnChainSwap(params: {
     });
   }
 
-  if (quote.dex === 'pancakeswap') {
-    const pancakeRouter = new ethers.Contract(
-      PANCAKE_ROUTER_V2_ADDRESS,
-      PANCAKE_ROUTER_V2_ABI,
-      signer
-    );
-
-    if (tokenIn.isNative && !tokenOut.isNative) {
-      return (await pancakeRouter.swapExactETHForTokensSupportingFeeOnTransferTokens(
-        amountOutMinWei,
-        quote.pancakePath,
-        userAddress,
-        deadline,
-        { value: amountInWei }
-      )) as ethers.TransactionResponse;
+  if (quote.useFeeWrapper) {
+    const feeWrapperAddress = getConfiguredFeeWrapperAddress();
+    if (!feeWrapperAddress) {
+      throw new Error('TamiSwapFeeRouter contract address is not configured.');
     }
+    const feeWrapper = new ethers.Contract(feeWrapperAddress, TAMI_FEE_ROUTER_ABI, signer);
 
-    if (!tokenIn.isNative && tokenOut.isNative) {
-      return (await pancakeRouter.swapExactTokensForETHSupportingFeeOnTransferTokens(
+    if (quote.dex === 'pancakeswap') {
+      if (tokenIn.isNative && !tokenOut.isNative) {
+        return (await feeWrapper.swapExactETHForTokensOnPancake(
+          amountOutMinWei,
+          quote.pancakePath,
+          userAddress,
+          deadline,
+          { value: amountInWei }
+        )) as ethers.TransactionResponse;
+      }
+      if (!tokenIn.isNative && tokenOut.isNative) {
+        return (await feeWrapper.swapExactTokensForETHOnPancake(
+          amountInWei,
+          amountOutMinWei,
+          quote.pancakePath,
+          userAddress,
+          deadline
+        )) as ethers.TransactionResponse;
+      }
+      return (await feeWrapper.swapExactTokensForTokensOnPancake(
         amountInWei,
         amountOutMinWei,
         quote.pancakePath,
@@ -724,29 +764,25 @@ export async function executeOnChainSwap(params: {
       )) as ethers.TransactionResponse;
     }
 
-    return (await pancakeRouter.swapExactTokensForTokensSupportingFeeOnTransferTokens(
-      amountInWei,
-      amountOutMinWei,
-      quote.pancakePath,
-      userAddress,
-      deadline
-    )) as ethers.TransactionResponse;
-  }
-
-  const router = new ethers.Contract(THENA_ROUTER_V2_ADDRESS, ROUTER_V2_ABI, signer);
-
-  if (tokenIn.isNative && !tokenOut.isNative) {
-    return (await router.swapExactETHForTokens(
-      amountOutMinWei,
-      quote.routes,
-      userAddress,
-      deadline,
-      { value: amountInWei }
-    )) as ethers.TransactionResponse;
-  }
-
-  if (!tokenIn.isNative && tokenOut.isNative) {
-    return (await router.swapExactTokensForETH(
+    if (tokenIn.isNative && !tokenOut.isNative) {
+      return (await feeWrapper.swapExactETHForTokensOnThena(
+        amountOutMinWei,
+        quote.routes,
+        userAddress,
+        deadline,
+        { value: amountInWei }
+      )) as ethers.TransactionResponse;
+    }
+    if (!tokenIn.isNative && tokenOut.isNative) {
+      return (await feeWrapper.swapExactTokensForETHOnThena(
+        amountInWei,
+        amountOutMinWei,
+        quote.routes,
+        userAddress,
+        deadline
+      )) as ethers.TransactionResponse;
+    }
+    return (await feeWrapper.swapExactTokensForTokensOnThena(
       amountInWei,
       amountOutMinWei,
       quote.routes,
@@ -755,11 +791,7 @@ export async function executeOnChainSwap(params: {
     )) as ethers.TransactionResponse;
   }
 
-  return (await router.swapExactTokensForTokens(
-    amountInWei,
-    amountOutMinWei,
-    quote.routes,
-    userAddress,
-    deadline
-  )) as ethers.TransactionResponse;
+  throw new Error(
+    'Platform fee enforcement blocked un-wrapped execution. Refresh your quote to route with the 0.25% fee.'
+  );
 }
