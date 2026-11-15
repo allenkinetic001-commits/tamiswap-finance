@@ -117,12 +117,13 @@ export default function App() {
     ) {
       if (!provider || typeof provider.request !== 'function') return;
       const canonicalKey = normalizeWalletKey(name, id);
+      const displayName = canonicalKey === 'trust-wallet' ? 'Trust Wallet' : name;
       const existing = map.get(canonicalKey);
       if (existing) {
         if (preferOverwrite) {
           map.set(canonicalKey, {
             id: canonicalKey,
-            name,
+            name: displayName,
             icon: icon || existing.icon,
             provider,
           });
@@ -133,7 +134,7 @@ export default function App() {
         (entry) => entry.provider === provider
       );
       if (sameProvider) return;
-      map.set(canonicalKey, { id: canonicalKey, name, icon, provider });
+      map.set(canonicalKey, { id: canonicalKey, name: displayName, icon, provider });
     }
 
     function onAnnounce(event: Event) {
