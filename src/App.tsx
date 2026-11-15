@@ -50,6 +50,21 @@ function inferProviderName(p: InjectedProvider): string {
   return 'Browser Web3 Wallet';
 }
 
+function getWalletIconMeta(name: string): { src: string; bgClass: string } | null {
+  const n = name.toLowerCase();
+  if (n.includes('metamask')) return { src: '/assets/wallets/metamask.png', bgClass: 'bg-white' };
+  if (n.includes('trust')) return { src: '/assets/wallets/trustwallet.png', bgClass: 'bg-white' };
+  if (n.includes('okx')) return { src: '/assets/wallets/okx.png', bgClass: 'bg-black' };
+  if (n.includes('coinbase')) return { src: '/assets/wallets/coinbase.png', bgClass: 'bg-white' };
+  if (n.includes('safepal')) return { src: '/assets/wallets/safepal.png', bgClass: 'bg-white' };
+  if (n.includes('bitget') || n.includes('bitkeep'))
+    return { src: '/assets/wallets/bitget.png', bgClass: 'bg-[#0B1222]' };
+  if (n.includes('rabby')) return { src: '/assets/wallets/rabby.png', bgClass: 'bg-[#7084FF]' };
+  if (n.includes('binance')) return { src: '/assets/wallets/binance.png', bgClass: 'bg-[#0B1222]' };
+  if (n.includes('phantom')) return { src: '/assets/wallets/phantom.png', bgClass: 'bg-[#534BB1]' };
+  return null;
+}
+
 export default function App() {
   const [wallets, setWallets] = useState<DiscoveredWallet[]>([]);
   const [activeProvider, setActiveProvider] = useState<InjectedProvider | null>(null);
@@ -273,13 +288,15 @@ export default function App() {
         {
           id: 'metamask',
           name: 'MetaMask',
-          badge: 'Popular',
+          icon: '/assets/wallets/metamask.png',
+          iconBg: 'bg-white',
           href: `https://metamask.app.link/dapp/${dappHostPath}`,
         },
         {
           id: 'trustwallet',
           name: 'Trust Wallet',
-          badge: 'Mobile',
+          icon: '/assets/wallets/trustwallet.png',
+          iconBg: 'bg-white',
           href: `https://link.trustwallet.com/open_url?coin_id=20000714&url=${encodeURIComponent(
             currentUrl
           )}`,
@@ -287,7 +304,8 @@ export default function App() {
         {
           id: 'okx',
           name: 'OKX Wallet',
-          badge: 'Mobile',
+          icon: '/assets/wallets/okx.png',
+          iconBg: 'bg-black',
           href: `https://www.okx.com/download?deeplink=${encodeURIComponent(
             `okx://wallet/dapp/url?dappUrl=${encodeURIComponent(currentUrl)}`
           )}`,
@@ -295,19 +313,22 @@ export default function App() {
         {
           id: 'coinbase',
           name: 'Coinbase Wallet',
-          badge: 'Mobile',
+          icon: '/assets/wallets/coinbase.png',
+          iconBg: 'bg-white',
           href: `https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(currentUrl)}`,
         },
         {
           id: 'safepal',
           name: 'SafePal Wallet',
-          badge: 'Mobile',
+          icon: '/assets/wallets/safepal.png',
+          iconBg: 'bg-white',
           href: `https://link.safepal.io/open_url?url=${encodeURIComponent(currentUrl)}`,
         },
         {
           id: 'bitget',
           name: 'Bitget Wallet',
-          badge: 'Mobile',
+          icon: '/assets/wallets/bitget.png',
+          iconBg: 'bg-[#0B1222]',
           href: `https://bkcode.vip?action=dapp&url=${encodeURIComponent(currentUrl)}`,
         },
       ]
@@ -737,7 +758,7 @@ export default function App() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 8 }}
               transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-              className="armor-chassis-shell w-full max-w-sm"
+              className="armor-chassis-shell w-full max-w-[400px]"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="armor-chassis-rim">
@@ -798,40 +819,45 @@ export default function App() {
                           <div className="font-mono text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
                             Detected Browser Wallets
                           </div>
-                          {wallets.map((w) => (
-                            <button
-                              key={w.id}
-                              type="button"
-                              onClick={() => connectWithProvider(w.provider)}
-                              className="combat-steel-btn flex w-full items-center justify-between px-3.5 py-2.5 text-left text-xs font-semibold text-slate-100"
-                            >
-                              <span className="flex items-center gap-2.5">
-                                {w.icon ? (
-                                  <img
-                                    src={w.icon}
-                                    alt={w.name}
-                                    width={20}
-                                    height={20}
-                                    className="h-5 w-5 rounded-full object-contain"
-                                  />
-                                ) : (
-                                  <Wallet
-                                    className={`h-4 w-4 ${
-                                      isRedMode ? 'text-red-300' : 'text-cyan-300'
-                                    }`}
-                                  />
-                                )}
-                                <span className="tracking-wide">{w.name}</span>
-                              </span>
-                              <span
-                                className={`font-mono text-[11px] ${
-                                  isRedMode ? 'text-red-300' : 'text-cyan-300'
-                                }`}
+                          {wallets.map((w) => {
+                            const fallbackMeta = getWalletIconMeta(w.name);
+                            const iconSrc = w.icon || fallbackMeta?.src;
+                            const iconBg = w.icon ? 'bg-transparent' : fallbackMeta?.bgClass || 'bg-white';
+                            return (
+                              <button
+                                key={w.id}
+                                type="button"
+                                onClick={() => connectWithProvider(w.provider)}
+                                className="combat-steel-btn flex w-full items-center justify-between px-3.5 py-2.5 text-left text-xs font-semibold text-slate-100"
                               >
-                                Connect
-                              </span>
-                            </button>
-                          ))}
+                                <span className="flex items-center gap-2.5">
+                                  {iconSrc ? (
+                                    <img
+                                      src={iconSrc}
+                                      alt={w.name}
+                                      width={22}
+                                      height={22}
+                                      className={`h-5.5 w-5.5 shrink-0 rounded-md object-contain p-0.5 ${iconBg}`}
+                                    />
+                                  ) : (
+                                    <Wallet
+                                      className={`h-4 w-4 ${
+                                        isRedMode ? 'text-red-300' : 'text-cyan-300'
+                                      }`}
+                                    />
+                                  )}
+                                  <span className="tracking-wide">{w.name}</span>
+                                </span>
+                                <span
+                                  className={`font-mono text-[11px] ${
+                                    isRedMode ? 'text-red-300' : 'text-cyan-300'
+                                  }`}
+                                >
+                                  Connect
+                                </span>
+                              </button>
+                            );
+                          })}
                         </div>
                       )}
 
@@ -853,11 +879,20 @@ export default function App() {
                               href={wallet.href}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="combat-steel-btn flex items-center justify-between px-3 py-2.5 text-xs font-semibold text-slate-100"
+                              className="combat-steel-btn flex items-center justify-between gap-1.5 px-2.5 py-2.5 text-xs font-semibold text-slate-100"
                             >
-                              <span className="truncate">{wallet.name}</span>
+                              <span className="flex min-w-0 items-center gap-2">
+                                <img
+                                  src={wallet.icon}
+                                  alt={wallet.name}
+                                  width={22}
+                                  height={22}
+                                  className={`h-5.5 w-5.5 shrink-0 rounded-md object-contain p-0.5 ${wallet.iconBg}`}
+                                />
+                                <span className="truncate">{wallet.name}</span>
+                              </span>
                               <ExternalLink
-                                className={`h-3 w-3 shrink-0 ${
+                                className={`h-3 w-3 shrink-0 opacity-80 ${
                                   isRedMode ? 'text-red-300' : 'text-cyan-300'
                                 }`}
                               />
