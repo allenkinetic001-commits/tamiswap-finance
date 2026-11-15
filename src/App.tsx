@@ -51,6 +51,20 @@ function inferProviderName(p: InjectedProvider): string {
   return 'Browser Web3 Wallet';
 }
 
+function normalizeWalletKey(name: string, rdns?: string): string {
+  const combined = `${rdns || ''} ${name}`.toLowerCase();
+  if (combined.includes('trust')) return 'trust-wallet';
+  if (combined.includes('binance')) return 'binance-wallet';
+  if (combined.includes('metamask')) return 'metamask';
+  if (combined.includes('rabby')) return 'rabby-wallet';
+  if (combined.includes('okx') || combined.includes('okex')) return 'okx-wallet';
+  if (combined.includes('coinbase')) return 'coinbase-wallet';
+  if (combined.includes('safepal')) return 'safepal-wallet';
+  if (combined.includes('bitget') || combined.includes('bitkeep')) return 'bitget-wallet';
+  if (combined.includes('phantom')) return 'phantom';
+  return rdns?.toLowerCase() || name.trim().toLowerCase();
+}
+
 function getWalletIconMeta(name: string): { src: string; bgClass: string } | null {
   const n = name.toLowerCase();
   if (n.includes('metamask')) return { src: '/assets/wallets/metamask.png', bgClass: 'bg-white' };
@@ -98,16 +112,28 @@ export default function App() {
       id: string,
       name: string,
       provider: InjectedProvider,
-      icon?: string
+      icon?: string,
+      preferOverwrite = false
     ) {
       if (!provider || typeof provider.request !== 'function') return;
-      const alreadyHasProvider = Array.from(map.values()).some(
-        (existing) => existing.provider === provider
-      );
-      if (alreadyHasProvider) return;
-      if (!map.has(id)) {
-        map.set(id, { id, name, icon, provider });
+      const canonicalKey = normalizeWalletKey(name, id);
+      const existing = map.get(canonicalKey);
+      if (existing) {
+        if (preferOverwrite) {
+          map.set(canonicalKey, {
+            id: canonicalKey,
+            name,
+            icon: icon || existing.icon,
+            provider,
+          });
+        }
+        return;
       }
+      const sameProvider = Array.from(map.values()).some(
+        (entry) => entry.provider === provider
+      );
+      if (sameProvider) return;
+      map.set(canonicalKey, { id: canonicalKey, name, icon, provider });
     }
 
     function onAnnounce(event: Event) {
@@ -117,7 +143,8 @@ export default function App() {
           e.detail.info.rdns || e.detail.info.uuid,
           e.detail.info.name,
           e.detail.provider,
-          e.detail.info.icon
+          e.detail.info.icon,
+          true
         );
         syncFromMap();
       }
@@ -132,31 +159,27 @@ export default function App() {
       okxwallet?: InjectedProvider;
       safepalProvider?: InjectedProvider;
       binancew3w?: { ethereum?: InjectedProvider };
-      BinanceChain?: InjectedProvider;
       bitkeep?: { ethereum?: InjectedProvider };
       phantom?: { ethereum?: InjectedProvider };
     };
 
     if (win.binancew3w?.ethereum) {
-      addCandidate('binancew3w-global', 'Binance Web3 Wallet', win.binancew3w.ethereum);
-    }
-    if (win.BinanceChain) {
-      addCandidate('binance-global', 'Binance Web3 Wallet', win.BinanceChain);
+      addCandidate('com.binance.wallet', 'Binance Web3 Wallet', win.binancew3w.ethereum);
     }
     if (win.trustwallet) {
-      addCandidate('trustwallet-global', 'Trust Wallet', win.trustwallet);
+      addCandidate('com.trustwallet.app', 'Trust Wallet', win.trustwallet);
     }
     if (win.okxwallet) {
-      addCandidate('okxwallet-global', 'OKX Wallet', win.okxwallet);
+      addCandidate('com.okex.wallet', 'OKX Wallet', win.okxwallet);
     }
     if (win.safepalProvider) {
-      addCandidate('safepal-global', 'SafePal Wallet', win.safepalProvider);
+      addCandidate('io.safepal', 'SafePal Wallet', win.safepalProvider);
     }
     if (win.bitkeep?.ethereum) {
-      addCandidate('bitget-global', 'Bitget Wallet', win.bitkeep.ethereum);
+      addCandidate('com.bitget.web3', 'Bitget Wallet', win.bitkeep.ethereum);
     }
     if (win.phantom?.ethereum) {
-      addCandidate('phantom-global', 'Phantom', win.phantom.ethereum);
+      addCandidate('app.phantom', 'Phantom', win.phantom.ethereum);
     }
     if (win.ethereum) {
       if (Array.isArray(win.ethereum.providers) && win.ethereum.providers.length > 0) {
@@ -240,9 +263,16 @@ export default function App() {
       const hex = (await chosen.request({ method: 'eth_chainId' })) as string;
       setChainId(parseInt(hex, 16));
     } catch (err: unknown) {
-      setWalletNotice(
-        err instanceof Error ? err.message : 'Wallet connection was rejected.'
-      );
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'object' &&
+            err !== null &&
+            'message' in err &&
+            typeof (err as { message?: unknown }).message === 'string'
+          ? (err as { message: string }).message
+          : 'Wallet connection was rejected.';
+      setWalletNotice(msg);
     }
   }
 
@@ -295,7 +325,7 @@ export default function App() {
     }
     handleCopySiteUrl();
     setModalNotice(
-      'DApp URL copied. Because Binance Web3 blocks external auto-redirects, open Binance App → Wallets → Web3 → Discover and paste the link.'
+      'DApp URL copied! Opening Binance App — go to Wallets → Web3 → Discover and paste the URL.'
     );
   }
 
@@ -319,7 +349,7 @@ export default function App() {
           name: 'Binance Wallet',
           icon: '/assets/wallets/binance.png',
           iconBg: 'bg-[#0B1222]',
-          href: 'https://app.binance.com/en/web3wallet',
+          href: 'bnc://app.binance.com/web3',
         },
         {
           id: 'okx',
@@ -897,8 +927,8 @@ export default function App() {
                             <a
                               key={wallet.id}
                               href={wallet.href}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                              target={wallet.id === 'binance' ? undefined : '_blank'}
+                              rel={wallet.id === 'binance' ? undefined : 'noopener noreferrer'}
                               onClick={
                                 wallet.id === 'binance'
                                   ? handleBinanceWalletClick
