@@ -143,9 +143,7 @@ export function SwapWidget({
     }
 
     setTokenOutSymbol(targetSymbol);
-    setTokenInSymbol((prevIn) =>
-      prevIn === targetSymbol ? (targetSymbol === 'BNB' ? 'USDT' : 'BNB') : prevIn
-    );
+    setTokenInSymbol(targetSymbol === 'BNB' ? 'USDT' : 'BNB');
     setTxHash(null);
     setTxError(null);
     setTxStatusText(null);
