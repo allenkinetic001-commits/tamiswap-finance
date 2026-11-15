@@ -19,6 +19,7 @@ interface InjectedProvider extends ethers.Eip1193Provider {
   isBitKeep?: boolean;
   isBitgetWallet?: boolean;
   isBinance?: boolean;
+  isBinanceWeb3Wallet?: boolean;
   isPhantom?: boolean;
   providers?: InjectedProvider[];
 }
@@ -44,7 +45,7 @@ function inferProviderName(p: InjectedProvider): string {
   if (p.isCoinbaseWallet) return 'Coinbase Wallet';
   if (p.isSafePal) return 'SafePal Wallet';
   if (p.isBitKeep || p.isBitgetWallet) return 'Bitget Wallet';
-  if (p.isBinance) return 'Binance Web3 Wallet';
+  if (p.isBinance || p.isBinanceWeb3Wallet) return 'Binance Web3 Wallet';
   if (p.isPhantom) return 'Phantom';
   if (p.isMetaMask) return 'MetaMask';
   return 'Browser Web3 Wallet';
@@ -72,6 +73,7 @@ export default function App() {
   const [chainId, setChainId] = useState<number | null>(null);
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [walletNotice, setWalletNotice] = useState<string | null>(null);
+  const [modalNotice, setModalNotice] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [isRedMode, setIsRedMode] = useState<boolean>(false);
 
@@ -129,11 +131,18 @@ export default function App() {
       trustwallet?: InjectedProvider;
       okxwallet?: InjectedProvider;
       safepalProvider?: InjectedProvider;
+      binancew3w?: { ethereum?: InjectedProvider };
       BinanceChain?: InjectedProvider;
       bitkeep?: { ethereum?: InjectedProvider };
       phantom?: { ethereum?: InjectedProvider };
     };
 
+    if (win.binancew3w?.ethereum) {
+      addCandidate('binancew3w-global', 'Binance Web3 Wallet', win.binancew3w.ethereum);
+    }
+    if (win.BinanceChain) {
+      addCandidate('binance-global', 'Binance Web3 Wallet', win.BinanceChain);
+    }
     if (win.trustwallet) {
       addCandidate('trustwallet-global', 'Trust Wallet', win.trustwallet);
     }
@@ -145,9 +154,6 @@ export default function App() {
     }
     if (win.bitkeep?.ethereum) {
       addCandidate('bitget-global', 'Bitget Wallet', win.bitkeep.ethereum);
-    }
-    if (win.BinanceChain) {
-      addCandidate('binance-global', 'Binance Web3 Wallet', win.BinanceChain);
     }
     if (win.phantom?.ethereum) {
       addCandidate('phantom-global', 'Phantom', win.phantom.ethereum);
@@ -242,6 +248,7 @@ export default function App() {
 
   function handleConnectButton() {
     setWalletNotice(null);
+    setModalNotice(null);
     setShowWalletModal(true);
   }
 
@@ -277,6 +284,21 @@ export default function App() {
     }
   }
 
+  function handleBinanceWalletClick(e: React.MouseEvent<HTMLAnchorElement>) {
+    const detectedBinance = wallets.find((w) =>
+      w.name.toLowerCase().includes('binance')
+    );
+    if (detectedBinance) {
+      e.preventDefault();
+      connectWithProvider(detectedBinance.provider);
+      return;
+    }
+    handleCopySiteUrl();
+    setModalNotice(
+      'DApp URL copied. Because Binance Web3 blocks external auto-redirects, open Binance App → Wallets → Web3 → Discover and paste the link.'
+    );
+  }
+
   const wrongNetwork = Boolean(walletAddress) && chainId !== null && chainId !== BSC_CHAIN_ID;
   const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
   const dappHostPath =
@@ -293,13 +315,11 @@ export default function App() {
           href: `https://metamask.app.link/dapp/${dappHostPath}`,
         },
         {
-          id: 'trustwallet',
-          name: 'Trust Wallet',
-          icon: '/assets/wallets/trustwallet.png',
-          iconBg: 'bg-white',
-          href: `https://link.trustwallet.com/open_url?coin_id=20000714&url=${encodeURIComponent(
-            currentUrl
-          )}`,
+          id: 'binance',
+          name: 'Binance Wallet',
+          icon: '/assets/wallets/binance.png',
+          iconBg: 'bg-[#0B1222]',
+          href: 'https://app.binance.com/en/web3wallet',
         },
         {
           id: 'okx',
@@ -869,7 +889,7 @@ export default function App() {
                         </div>
                         {wallets.length === 0 && (
                           <p className="text-xs leading-relaxed text-slate-300">
-                            Choose a mobile wallet app to open this DEX directly, or connect using a desktop browser extension (MetaMask, Rabby, OKX, Trust Wallet, Coinbase).
+                            Choose a mobile wallet app to open this DEX directly, or connect using a desktop browser extension (MetaMask, Rabby, OKX, Binance Web3, Coinbase).
                           </p>
                         )}
                         <div className="grid grid-cols-2 gap-2">
@@ -879,6 +899,11 @@ export default function App() {
                               href={wallet.href}
                               target="_blank"
                               rel="noopener noreferrer"
+                              onClick={
+                                wallet.id === 'binance'
+                                  ? handleBinanceWalletClick
+                                  : undefined
+                              }
                               className="combat-steel-btn flex items-center justify-between gap-1.5 px-2.5 py-2.5 text-xs font-semibold text-slate-100"
                             >
                               <span className="flex min-w-0 items-center gap-2">
@@ -899,6 +924,17 @@ export default function App() {
                             </a>
                           ))}
                         </div>
+                        {modalNotice && (
+                          <div
+                            className={`border px-3 py-2 text-[11px] leading-relaxed ${
+                              isRedMode
+                                ? 'border-red-400/45 bg-red-950/40 text-rose-100'
+                                : 'border-sky-400/45 bg-sky-950/40 text-cyan-100'
+                            }`}
+                          >
+                            {modalNotice}
+                          </div>
+                        )}
                       </div>
 
                       <button
