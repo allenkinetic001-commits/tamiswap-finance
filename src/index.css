@@ -379,6 +379,34 @@
   transform: translateX(360%) skewX(-24deg);
 }
 
+@media (max-width: 639px) {
+  .wallet-cyber-rim {
+    clip-path: polygon(
+      8px 0,
+      calc(100% - 8px) 0,
+      100% 8px,
+      100% calc(100% - 8px),
+      calc(100% - 8px) 100%,
+      8px 100%,
+      0 calc(100% - 8px),
+      0 8px
+    );
+  }
+
+  .wallet-cyber-btn {
+    clip-path: polygon(
+      7px 0,
+      calc(100% - 7px) 0,
+      100% 7px,
+      100% calc(100% - 7px),
+      calc(100% - 7px) 100%,
+      7px 100%,
+      0 calc(100% - 7px),
+      0 7px
+    );
+  }
+}
+
 @keyframes vein-surge {
   0% {
     opacity: 0.45;

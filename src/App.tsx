@@ -473,7 +473,7 @@ export default function App() {
       </div>
 
       {/* Stepped Armored Top Navigation Bar */}
-      <header className="combat-topbar relative z-20 flex h-16 sm:h-20 w-full items-center justify-between gap-1.5 sm:gap-4 px-2.5 sm:px-6">
+      <header className="combat-topbar relative z-20 flex h-16 sm:h-20 w-full items-center justify-between gap-1.5 sm:gap-4 px-2 sm:px-6">
         <div
           aria-hidden="true"
           className={`energy-vein-beam pointer-events-none absolute right-0 bottom-0 left-0 h-[2px] bg-gradient-to-r ${
@@ -482,8 +482,8 @@ export default function App() {
               : 'from-sky-500/40 via-cyan-300 to-sky-500/40'
           }`}
         />
-        <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
-          <div className="relative flex h-9 w-9 sm:h-16 sm:w-17 shrink-0 items-center justify-center">
+        <div className="flex min-w-0 items-center gap-1 sm:gap-3">
+          <div className="relative flex h-13 w-13 sm:h-16 sm:w-17 shrink-0 items-center justify-center">
             <div
               aria-hidden="true"
               className={`pointer-events-none absolute inset-1 rounded-full blur-md ${
@@ -495,7 +495,7 @@ export default function App() {
               alt="TamiSwap logo"
               width={68}
               height={64}
-              className={`relative z-10 h-9 w-auto sm:h-16 object-contain [image-rendering:-webkit-optimize-contrast] transition-opacity duration-150 ${
+              className={`relative z-10 h-13 w-auto sm:h-16 object-contain [image-rendering:-webkit-optimize-contrast] transition-opacity duration-150 ${
                 isRedMode ? 'opacity-0 pointer-events-none' : 'opacity-100'
               }`}
             />
@@ -504,7 +504,7 @@ export default function App() {
               alt="TamiSwap logo red mode"
               width={68}
               height={64}
-              className={`absolute inset-0 m-auto z-10 h-9 w-auto sm:h-16 object-contain drop-shadow-[0_0_10px_rgba(255,30,56,0.55)] [image-rendering:-webkit-optimize-contrast] transition-opacity duration-150 ${
+              className={`absolute inset-0 m-auto z-10 h-13 w-auto sm:h-16 object-contain drop-shadow-[0_0_10px_rgba(255,30,56,0.55)] [image-rendering:-webkit-optimize-contrast] transition-opacity duration-150 ${
                 isRedMode ? 'opacity-100' : 'opacity-0 pointer-events-none'
               }`}
             />
@@ -515,7 +515,7 @@ export default function App() {
               alt="TamiSwap"
               width={180}
               height={60}
-              className={`relative z-10 h-auto max-h-6 w-full max-w-[78px] sm:h-11 sm:max-h-none sm:w-auto sm:max-w-none object-contain drop-shadow-[0_0_12px_rgba(0,180,255,0.45)] [image-rendering:-webkit-optimize-contrast] transition-opacity duration-150 ${
+              className={`relative z-10 h-auto max-h-5.5 w-full max-w-[68px] sm:h-11 sm:max-h-none sm:w-auto sm:max-w-none object-contain drop-shadow-[0_0_12px_rgba(0,180,255,0.45)] [image-rendering:-webkit-optimize-contrast] transition-opacity duration-150 ${
                 isRedMode ? 'opacity-0 pointer-events-none' : 'opacity-100'
               }`}
             />
@@ -531,7 +531,7 @@ export default function App() {
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-3">
           <div
             role="group"
             aria-label="Theme color switch"
@@ -547,7 +547,7 @@ export default function App() {
               aria-pressed={!isRedMode}
               aria-label="Switch to Blue theme"
               title="Blue Mode"
-              className={`flex h-5 w-5 sm:h-6 sm:w-6 cursor-pointer items-center justify-center rounded-full transition-all duration-150 ${
+              className={`flex h-4.5 w-4.5 sm:h-6 sm:w-6 cursor-pointer items-center justify-center rounded-full transition-all duration-150 ${
                 !isRedMode
                   ? 'bg-gradient-to-br from-cyan-100 via-sky-400 to-blue-600 shadow-[0_0_10px_rgba(0,212,255,0.95)] ring-1 ring-cyan-200'
                   : 'bg-sky-500/25 opacity-55 hover:opacity-90'
@@ -559,7 +559,7 @@ export default function App() {
               aria-pressed={isRedMode}
               aria-label="Switch to Red theme"
               title="Red Mode"
-              className={`flex h-5 w-5 sm:h-6 sm:w-6 cursor-pointer items-center justify-center rounded-full transition-all duration-150 ${
+              className={`flex h-4.5 w-4.5 sm:h-6 sm:w-6 cursor-pointer items-center justify-center rounded-full transition-all duration-150 ${
                 isRedMode
                   ? 'bg-gradient-to-br from-rose-200 via-red-500 to-red-700 shadow-[0_0_10px_rgba(255,40,64,0.95)] ring-1 ring-rose-200'
                   : 'bg-red-500/25 opacity-55 hover:opacity-90'
@@ -577,10 +577,10 @@ export default function App() {
                   ? () => setShowWalletModal(true)
                   : handleConnectButton
               }
-              className="wallet-cyber-btn inline-flex items-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 font-display text-[10px] sm:text-xs font-bold tracking-wider text-white uppercase whitespace-nowrap shrink-0"
+              className="wallet-cyber-btn inline-flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1 sm:py-2 font-display text-[8.5px] sm:text-xs font-bold tracking-normal sm:tracking-wider text-white uppercase whitespace-nowrap shrink-0"
             >
               <Wallet
-                className={`h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0 ${
+                className={`h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 shrink-0 ${
                   isRedMode
                     ? 'text-red-300 drop-shadow-[0_0_6px_rgba(255,40,64,0.9)]'
                     : 'text-cyan-300 drop-shadow-[0_0_6px_rgba(0,212,255,0.9)]'
