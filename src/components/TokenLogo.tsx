@@ -16,6 +16,7 @@ const SYMBOL_LOGO_FALLBACKS: Record<string, string[]> = {
     'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/smartchain/assets/0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c/logo.png',
     'https://coin-images.coingecko.com/coins/images/825/small/bnb-icon2_2x.png',
   ],
+  TAMIYANOIA: ['/assets/aistudio/tamiswap_00325eac.png'],
   THE: [
     'https://coin-images.coingecko.com/coins/images/28864/small/Symbol-Color200x200.png?1706810126',
     'https://icons.llamao.fi/icons/protocols/thena?w=128&h=128',

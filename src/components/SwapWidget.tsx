@@ -16,6 +16,7 @@ import {
   BSC_CHAIN_ID,
   DEFAULT_SWAP_TOKENS,
   SwapToken,
+  TAMIYANOIA_ADDRESS,
   THENA_ROUTER_V2_ADDRESS,
 } from '../data/swapTokens';
 import {
@@ -68,7 +69,7 @@ export function SwapWidget({
   const [loadingBalances, setLoadingBalances] = useState(false);
 
   const [tokenInSymbol, setTokenInSymbol] = useState('BNB');
-  const [tokenOutSymbol, setTokenOutSymbol] = useState('THE');
+  const [tokenOutSymbol, setTokenOutSymbol] = useState('TAMIYANOIA');
   const [amountInStr, setAmountInStr] = useState('0.1');
   const [routeMode, setRouteMode] = useState<RouteMode>('auto');
   const [slippagePct, setSlippagePct] = useState(0.5);
@@ -166,7 +167,7 @@ export function SwapWidget({
         if (cancelled) return;
         if (!res) {
           setQuote(null);
-          setQuoteError('No THENA liquidity route found on BNB Chain.');
+          setQuoteError('No liquidity route found on BNB Chain.');
         } else {
           setQuote(res);
           setQuoteError(null);
@@ -201,7 +202,8 @@ export function SwapWidget({
     }
     setCheckingAllowance(true);
     try {
-      const val = await fetchAllowance(tokenIn.address, walletAddress);
+      const spenderAddress = quote?.routerAddress || THENA_ROUTER_V2_ADDRESS;
+      const val = await fetchAllowance(tokenIn.address, walletAddress, spenderAddress);
       setAllowanceWei(val);
     } catch {
       setAllowanceWei(0n);
@@ -330,13 +332,16 @@ export function SwapWidget({
     setTxHash(null);
     setTxStatusText(`Waiting for ${tokenIn.symbol} approval in wallet...`);
     try {
+      const spenderAddress = quote?.routerAddress || THENA_ROUTER_V2_ADDRESS;
+      const dexLabel = quote?.dexLabel || 'THENA RouterV2';
       const receipt = await approveTokenForRouter(
         provider,
         tokenIn.address,
-        amountInWei
+        amountInWei,
+        spenderAddress
       );
       if (receipt) setTxHash(receipt.hash);
-      setTxStatusText(`${tokenIn.symbol} approved for THENA RouterV2.`);
+      setTxStatusText(`${tokenIn.symbol} approved for ${dexLabel}.`);
       await refreshAllowance();
     } catch (err: unknown) {
       const msg =
@@ -363,9 +368,8 @@ export function SwapWidget({
         tokenOut,
         amountInWei,
         amountOutMinWei: minReceivedWei,
-        routes: quote.routes,
+        quote,
         deadlineMinutes: deadlineMin,
-        isWrapOrUnwrap: quote.isWrapOrUnwrap,
       });
       setTxHash(tx.hash);
       setTxStatusText('Transaction submitted — waiting for BNB Chain confirmation...');
@@ -485,14 +489,21 @@ export function SwapWidget({
               <h1 className="font-display chrome-text text-2xl font-extrabold tracking-widest uppercase">
                 Swap
               </h1>
-              <p
-                className={`mt-1 font-mono text-xs font-medium ${
+              <a
+                href={`https://bscscan.com/token/${TAMIYANOIA_ADDRESS}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={TAMIYANOIA_ADDRESS}
+                className={`mt-1 inline-flex items-center gap-1 font-mono text-xs font-medium hover:underline ${
                   isRedMode ? 'text-red-400' : 'text-sky-400'
                 }`}
               >
-                THENA RouterV2 · {THENA_ROUTER_V2_ADDRESS.slice(0, 6)}...
-                {THENA_ROUTER_V2_ADDRESS.slice(-4)}
-              </p>
+                <span>
+                  TAMIYANOIA · {TAMIYANOIA_ADDRESS.slice(0, 6)}...
+                  {TAMIYANOIA_ADDRESS.slice(-4)}
+                </span>
+                <ExternalLink className="h-3 w-3 shrink-0 opacity-80" />
+              </a>
             </div>
 
             <div className="flex items-center gap-2">
@@ -713,10 +724,10 @@ export function SwapWidget({
                 <button
                   type="button"
                   onClick={() => setSelectorSide('in')}
-                  className="combat-steel-btn inline-flex shrink-0 items-center gap-2.5 px-3.5 py-2 text-sm font-bold tracking-wider text-white whitespace-nowrap"
+                  className="combat-steel-btn inline-flex shrink-0 items-center gap-1.5 sm:gap-2.5 px-2.5 sm:px-3.5 py-2 text-xs sm:text-sm font-bold tracking-wider text-white whitespace-nowrap"
                 >
                   <TokenLogo token={tokenIn} size={22} />
-                  <span className="font-sans text-sm font-bold tracking-wide text-white">
+                  <span className="font-sans text-xs sm:text-sm font-bold tracking-wide text-white">
                     {tokenIn.symbol}
                   </span>
                   <ChevronDown className={`h-4 w-4 ${isRedMode ? 'text-red-300' : 'text-sky-300'}`} />
@@ -762,7 +773,14 @@ export function SwapWidget({
               </div>
 
               <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0 flex-1 truncate font-mono text-2xl sm:text-[28px] font-bold text-white tabular-nums">
+                <div
+                  title={quote ? quote.amountOutFormatted : undefined}
+                  className={`min-w-0 flex-1 truncate font-mono font-bold text-white tabular-nums ${
+                    quote && formatDisplayAmount(quote.amountOutFormatted).length > 13
+                      ? 'text-lg sm:text-2xl'
+                      : 'text-2xl sm:text-[28px]'
+                  }`}
+                >
                   {quoting && amountInWei > 0n ? (
                     <span
                       className={`inline-flex items-center gap-2 text-base font-medium ${
@@ -790,10 +808,10 @@ export function SwapWidget({
                 <button
                   type="button"
                   onClick={() => setSelectorSide('out')}
-                  className="combat-steel-btn inline-flex shrink-0 items-center gap-2.5 px-3.5 py-2 text-sm font-bold tracking-wider text-white whitespace-nowrap"
+                  className="combat-steel-btn inline-flex shrink-0 items-center gap-1.5 sm:gap-2.5 px-2.5 sm:px-3.5 py-2 text-xs sm:text-sm font-bold tracking-wider text-white whitespace-nowrap"
                 >
                   <TokenLogo token={tokenOut} size={22} />
-                  <span className="font-sans text-sm font-bold tracking-wide text-white">
+                  <span className="font-sans text-xs sm:text-sm font-bold tracking-wide text-white">
                     {tokenOut.symbol}
                   </span>
                   <ChevronDown className={`h-4 w-4 ${isRedMode ? 'text-red-300' : 'text-sky-300'}`} />
@@ -852,10 +870,10 @@ export function SwapWidget({
                   {(quote.feeBps / 100).toFixed(2)}%
                 </span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">On-chain route</span>
-                <span className={`font-mono ${isRedMode ? 'text-rose-200' : 'text-cyan-200'}`}>
-                  {quote.routeSymbols.join(' → ')}
+              <div className="flex items-center justify-between gap-2">
+                <span className="shrink-0 text-slate-400">On-chain route</span>
+                <span className={`truncate text-right font-mono ${isRedMode ? 'text-rose-200' : 'text-cyan-200'}`}>
+                  {quote.routeSymbols.join(' → ')} · {quote.dexLabel}
                 </span>
               </div>
             </div>

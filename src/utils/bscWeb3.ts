@@ -3,6 +3,8 @@ import {
   BSC_CHAIN_ID,
   BSC_CHAIN_ID_HEX,
   BSC_RPC_URLS,
+  PANCAKE_PAIR_FACTORY_ADDRESS,
+  PANCAKE_ROUTER_V2_ADDRESS,
   SwapToken,
   THENA_PAIR_FACTORY_ADDRESS,
   THENA_ROUTER_V2_ADDRESS,
@@ -16,10 +18,16 @@ export interface RouteHop {
   stable: boolean;
 }
 
+export type DexId = 'thena' | 'pancakeswap';
+
 export interface OnChainQuote {
+  dex: DexId;
+  dexLabel: string;
+  routerAddress: string;
   amountOutWei: bigint;
   amountOutFormatted: string;
   routes: RouteHop[];
+  pancakePath: string[];
   routeSymbols: string[];
   priceImpactPct: number;
   feeBps: number;
@@ -48,9 +56,20 @@ const ROUTER_V2_ABI = [
   'function swapExactTokensForETH(uint256 amountIn, uint256 amountOutMin, (address from, address to, bool stable)[] routes, address to, uint256 deadline) returns (uint256[] amounts)',
 ];
 
+const PANCAKE_ROUTER_V2_ABI = [
+  'function getAmountsOut(uint256 amountIn, address[] path) view returns (uint256[] amounts)',
+  'function swapExactTokensForTokensSupportingFeeOnTransferTokens(uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline)',
+  'function swapExactETHForTokensSupportingFeeOnTransferTokens(uint256 amountOutMin, address[] path, address to, uint256 deadline) payable',
+  'function swapExactTokensForETHSupportingFeeOnTransferTokens(uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline)',
+];
+
 const PAIR_FACTORY_ABI = [
   'function getPair(address tokenA, address tokenB, bool stable) view returns (address)',
   'function getFee(bool _stable) view returns (uint256)',
+];
+
+const PANCAKE_FACTORY_ABI = [
+  'function getPair(address tokenA, address tokenB) view returns (address)',
 ];
 
 const PAIR_ABI = [
@@ -160,11 +179,12 @@ export async function fetchWalletBalances(
 
 export async function fetchAllowance(
   tokenAddress: string,
-  ownerAddress: string
+  ownerAddress: string,
+  spenderAddress: string = THENA_ROUTER_V2_ADDRESS
 ): Promise<bigint> {
   const provider = await getBscReadProvider();
   const token = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
-  return (await token.allowance(ownerAddress, THENA_ROUTER_V2_ADDRESS)) as bigint;
+  return (await token.allowance(ownerAddress, spenderAddress)) as bigint;
 }
 
 export async function fetchOnChainQuote(params: {
@@ -183,9 +203,13 @@ export async function fetchOnChainQuote(params: {
     (tokenOut.isNative && tokenIn.address.toLowerCase() === WBNB_ADDRESS.toLowerCase())
   ) {
     return {
+      dex: 'thena',
+      dexLabel: 'WBNB Wrap',
+      routerAddress: WBNB_ADDRESS,
       amountOutWei: amountInWei,
       amountOutFormatted: ethers.formatUnits(amountInWei, tokenOut.decimals),
       routes: [],
+      pancakePath: [],
       routeSymbols: [tokenIn.symbol, tokenOut.symbol],
       priceImpactPct: 0,
       feeBps: 0,
@@ -199,19 +223,29 @@ export async function fetchOnChainQuote(params: {
   }
 
   const provider = await getBscReadProvider();
-  const router = new ethers.Contract(THENA_ROUTER_V2_ADDRESS, ROUTER_V2_ABI, provider);
-  const factory = new ethers.Contract(THENA_PAIR_FACTORY_ADDRESS, PAIR_FACTORY_ABI, provider);
+  const thenaRouter = new ethers.Contract(THENA_ROUTER_V2_ADDRESS, ROUTER_V2_ABI, provider);
+  const thenaFactory = new ethers.Contract(THENA_PAIR_FACTORY_ADDRESS, PAIR_FACTORY_ABI, provider);
+  const pancakeRouter = new ethers.Contract(
+    PANCAKE_ROUTER_V2_ADDRESS,
+    PANCAKE_ROUTER_V2_ABI,
+    provider
+  );
+  const pancakeFactory = new ethers.Contract(
+    PANCAKE_PAIR_FACTORY_ADDRESS,
+    PANCAKE_FACTORY_ABI,
+    provider
+  );
 
-  const candidateRoutes: RouteHop[][] = [];
+  const thenaCandidateRoutes: RouteHop[][] = [];
   const tryModes: boolean[] =
     mode === 'volatile' ? [false] : mode === 'stable' ? [true] : [false, true];
 
-  // Direct 1-hop routes
+  // Direct 1-hop routes on THENA
   for (const stable of tryModes) {
-    candidateRoutes.push([{ from: tokenIn.address, to: tokenOut.address, stable }]);
+    thenaCandidateRoutes.push([{ from: tokenIn.address, to: tokenOut.address, stable }]);
   }
 
-  // 2-hop routes through WBNB and USDT when in auto mode or direct pair has low/no liquidity
+  // 2-hop routes through WBNB and USDT
   const intermediates = [WBNB_ADDRESS, USDT_ADDRESS].filter(
     (mid) =>
       mid.toLowerCase() !== tokenIn.address.toLowerCase() &&
@@ -221,7 +255,7 @@ export async function fetchOnChainQuote(params: {
   for (const mid of intermediates) {
     for (const s1 of tryModes) {
       for (const s2 of tryModes) {
-        candidateRoutes.push([
+        thenaCandidateRoutes.push([
           { from: tokenIn.address, to: mid, stable: s1 },
           { from: mid, to: tokenOut.address, stable: s2 },
         ]);
@@ -229,60 +263,114 @@ export async function fetchOnChainQuote(params: {
     }
   }
 
-  const results = await Promise.all(
-    candidateRoutes.map(async (routes) => {
-      try {
-        const amounts = (await router.getAmountsOut(amountInWei, routes)) as bigint[];
-        const outWei = amounts[amounts.length - 1];
-        if (outWei <= 0n) return null;
-        return { routes, outWei };
-      } catch {
-        return null;
-      }
-    })
-  );
+  // PancakeSwap V2 paths (active in auto and volatile modes)
+  const pancakeCandidatePaths: string[][] = [];
+  if (mode !== 'stable') {
+    pancakeCandidatePaths.push([tokenIn.address, tokenOut.address]);
+    for (const mid of intermediates) {
+      pancakeCandidatePaths.push([tokenIn.address, mid, tokenOut.address]);
+    }
+  }
 
-  const valid = results.filter(
-    (r): r is { routes: RouteHop[]; outWei: bigint } => r !== null
+  type QuoteCandidate =
+    | { dex: 'thena'; routes: RouteHop[]; pancakePath: string[]; outWei: bigint }
+    | { dex: 'pancakeswap'; routes: RouteHop[]; pancakePath: string[]; outWei: bigint };
+
+  const [thenaResults, pancakeResults] = await Promise.all([
+    Promise.all(
+      thenaCandidateRoutes.map(async (routes): Promise<QuoteCandidate | null> => {
+        try {
+          const amounts = (await thenaRouter.getAmountsOut(amountInWei, routes)) as bigint[];
+          const outWei = amounts[amounts.length - 1];
+          if (outWei <= 0n) return null;
+          return { dex: 'thena', routes, pancakePath: [], outWei };
+        } catch {
+          return null;
+        }
+      })
+    ),
+    Promise.all(
+      pancakeCandidatePaths.map(async (path): Promise<QuoteCandidate | null> => {
+        try {
+          const amounts = (await pancakeRouter.getAmountsOut(amountInWei, path)) as bigint[];
+          const outWei = amounts[amounts.length - 1];
+          if (outWei <= 0n) return null;
+          return { dex: 'pancakeswap', routes: [], pancakePath: path, outWei };
+        } catch {
+          return null;
+        }
+      })
+    ),
+  ]);
+
+  const valid = [...thenaResults, ...pancakeResults].filter(
+    (r): r is QuoteCandidate => r !== null
   );
   if (valid.length === 0) return null;
 
   valid.sort((a, b) => (b.outWei > a.outWei ? 1 : b.outWei < a.outWei ? -1 : 0));
   const best = valid[0];
 
-  // Inspect first hop pair reserves & fee for price impact display
   let pairAddress: string | null = null;
-  let feeBps = best.routes[0].stable ? 4 : 20;
+  let feeBps = best.dex === 'pancakeswap' ? 25 * (best.pancakePath.length - 1) : best.routes[0].stable ? 4 : 20;
   let priceImpactPct = 0;
 
   try {
-    const firstHop = best.routes[0];
-    const [pAddr, feeVal] = await Promise.all([
-      factory.getPair(firstHop.from, firstHop.to, firstHop.stable) as Promise<string>,
-      factory.getFee(firstHop.stable) as Promise<bigint>,
-    ]);
-    if (pAddr && pAddr !== ethers.ZeroAddress) {
-      pairAddress = pAddr;
-      feeBps = Number(feeVal) * best.routes.length;
-      if (best.routes.length === 1) {
-        const pair = new ethers.Contract(pAddr, PAIR_ABI, provider);
-        const [[r0, r1], t0] = await Promise.all([
-          pair.getReserves() as Promise<[bigint, bigint, bigint]>,
-          pair.token0() as Promise<string>,
-        ]);
-        const isT0In = t0.toLowerCase() === tokenIn.address.toLowerCase();
-        const resIn = Number(ethers.formatUnits(isT0In ? r0 : r1, tokenIn.decimals));
-        const resOut = Number(ethers.formatUnits(isT0In ? r1 : r0, tokenOut.decimals));
-        const inFloat = Number(ethers.formatUnits(amountInWei, tokenIn.decimals));
-        const outFloat = Number(ethers.formatUnits(best.outWei, tokenOut.decimals));
-        if (resIn > 0 && resOut > 0 && inFloat > 0) {
-          const spot = resOut / resIn;
-          const exec = outFloat / inFloat;
-          priceImpactPct = Math.max(0, ((spot - exec) / spot) * 100);
+    if (best.dex === 'thena') {
+      const firstHop = best.routes[0];
+      const [pAddr, feeVal] = await Promise.all([
+        thenaFactory.getPair(firstHop.from, firstHop.to, firstHop.stable) as Promise<string>,
+        thenaFactory.getFee(firstHop.stable) as Promise<bigint>,
+      ]);
+      if (pAddr && pAddr !== ethers.ZeroAddress) {
+        pairAddress = pAddr;
+        feeBps = Number(feeVal) * best.routes.length;
+        if (best.routes.length === 1) {
+          const pair = new ethers.Contract(pAddr, PAIR_ABI, provider);
+          const [[r0, r1], t0] = await Promise.all([
+            pair.getReserves() as Promise<[bigint, bigint, bigint]>,
+            pair.token0() as Promise<string>,
+          ]);
+          const isT0In = t0.toLowerCase() === tokenIn.address.toLowerCase();
+          const resIn = Number(ethers.formatUnits(isT0In ? r0 : r1, tokenIn.decimals));
+          const resOut = Number(ethers.formatUnits(isT0In ? r1 : r0, tokenOut.decimals));
+          const inFloat = Number(ethers.formatUnits(amountInWei, tokenIn.decimals));
+          const outFloat = Number(ethers.formatUnits(best.outWei, tokenOut.decimals));
+          if (resIn > 0 && resOut > 0 && inFloat > 0) {
+            const spot = resOut / resIn;
+            const exec = outFloat / inFloat;
+            priceImpactPct = Math.max(0, ((spot - exec) / spot) * 100);
+          }
+        } else {
+          priceImpactPct = 0.05;
         }
-      } else {
-        // Approximate multi-hop impact conservatively from fee + depth
-        priceImpactPct = 0.05;
+      }
+    } else {
+      const pAddr = (await pancakeFactory.getPair(
+        best.pancakePath[0],
+        best.pancakePath[1]
+      )) as string;
+      if (pAddr && pAddr !== ethers.ZeroAddress) {
+        pairAddress = pAddr;
+        if (best.pancakePath.length === 2) {
+          const pair = new ethers.Contract(pAddr, PAIR_ABI, provider);
+          const [[r0, r1], t0] = await Promise.all([
+            pair.getReserves() as Promise<[bigint, bigint, bigint]>,
+            pair.token0() as Promise<string>,
+          ]);
+          const isT0In = t0.toLowerCase() === tokenIn.address.toLowerCase();
+          const resIn = Number(ethers.formatUnits(isT0In ? r0 : r1, tokenIn.decimals));
+          const resOut = Number(ethers.formatUnits(isT0In ? r1 : r0, tokenOut.decimals));
+          const inFloat = Number(ethers.formatUnits(amountInWei, tokenIn.decimals));
+          const outFloat = Number(ethers.formatUnits(best.outWei, tokenOut.decimals));
+          if (resIn > 0 && resOut > 0 && inFloat > 0) {
+            const spot = resOut / resIn;
+            const exec = outFloat / inFloat;
+            priceImpactPct = Math.max(0, ((spot - exec) / spot) * 100);
+          }
+        } else {
+          priceImpactPct = 0.25;
+        }
       }
     }
   } catch {
@@ -290,19 +378,35 @@ export async function fetchOnChainQuote(params: {
   }
 
   const routeSymbols = [tokenIn.symbol];
-  for (let i = 0; i < best.routes.length; i++) {
-    const addr = best.routes[i].to.toLowerCase();
-    if (i === best.routes.length - 1) {
-      routeSymbols.push(tokenOut.symbol);
-    } else {
-      routeSymbols.push(tokenSymbolMap[addr] || `${addr.slice(0, 6)}...`);
+  if (best.dex === 'thena') {
+    for (let i = 0; i < best.routes.length; i++) {
+      const addr = best.routes[i].to.toLowerCase();
+      if (i === best.routes.length - 1) {
+        routeSymbols.push(tokenOut.symbol);
+      } else {
+        routeSymbols.push(tokenSymbolMap[addr] || `${addr.slice(0, 6)}...`);
+      }
+    }
+  } else {
+    for (let i = 1; i < best.pancakePath.length; i++) {
+      const addr = best.pancakePath[i].toLowerCase();
+      if (i === best.pancakePath.length - 1) {
+        routeSymbols.push(tokenOut.symbol);
+      } else {
+        routeSymbols.push(tokenSymbolMap[addr] || `${addr.slice(0, 6)}...`);
+      }
     }
   }
 
   return {
+    dex: best.dex,
+    dexLabel: best.dex === 'pancakeswap' ? 'PancakeSwap V2' : 'THENA RouterV2',
+    routerAddress:
+      best.dex === 'pancakeswap' ? PANCAKE_ROUTER_V2_ADDRESS : THENA_ROUTER_V2_ADDRESS,
     amountOutWei: best.outWei,
     amountOutFormatted: ethers.formatUnits(best.outWei, tokenOut.decimals),
     routes: best.routes,
+    pancakePath: best.pancakePath,
     routeSymbols,
     priceImpactPct,
     feeBps,
@@ -314,16 +418,14 @@ export async function fetchOnChainQuote(params: {
 export async function approveTokenForRouter(
   ethereum: ethers.Eip1193Provider,
   tokenAddress: string,
-  amountWei: bigint
+  amountWei: bigint,
+  spenderAddress: string = THENA_ROUTER_V2_ADDRESS
 ): Promise<ethers.TransactionReceipt | null> {
   await ensureBscNetwork(ethereum);
   const browserProvider = new ethers.BrowserProvider(ethereum);
   const signer = await browserProvider.getSigner();
   const token = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
-  const tx = (await token.approve(
-    THENA_ROUTER_V2_ADDRESS,
-    amountWei
-  )) as ethers.TransactionResponse;
+  const tx = (await token.approve(spenderAddress, amountWei)) as ethers.TransactionResponse;
   return await tx.wait();
 }
 
@@ -333,9 +435,8 @@ export async function executeOnChainSwap(params: {
   tokenOut: SwapToken;
   amountInWei: bigint;
   amountOutMinWei: bigint;
-  routes: RouteHop[];
+  quote: OnChainQuote;
   deadlineMinutes: number;
-  isWrapOrUnwrap: boolean;
 }): Promise<ethers.TransactionResponse> {
   const {
     ethereum,
@@ -343,9 +444,8 @@ export async function executeOnChainSwap(params: {
     tokenOut,
     amountInWei,
     amountOutMinWei,
-    routes,
+    quote,
     deadlineMinutes,
-    isWrapOrUnwrap,
   } = params;
 
   await ensureBscNetwork(ethereum);
@@ -353,7 +453,7 @@ export async function executeOnChainSwap(params: {
   const signer = await browserProvider.getSigner();
   const userAddress = await signer.getAddress();
 
-  if (isWrapOrUnwrap) {
+  if (quote.isWrapOrUnwrap) {
     const wbnb = new ethers.Contract(WBNB_ADDRESS, WBNB_ABI, signer);
     if (tokenIn.isNative) {
       return (await wbnb.deposit({ value: amountInWei })) as ethers.TransactionResponse;
@@ -362,13 +462,50 @@ export async function executeOnChainSwap(params: {
     }
   }
 
-  const router = new ethers.Contract(THENA_ROUTER_V2_ADDRESS, ROUTER_V2_ABI, signer);
   const deadline = BigInt(Math.floor(Date.now() / 1000) + deadlineMinutes * 60);
+
+  if (quote.dex === 'pancakeswap') {
+    const pancakeRouter = new ethers.Contract(
+      PANCAKE_ROUTER_V2_ADDRESS,
+      PANCAKE_ROUTER_V2_ABI,
+      signer
+    );
+
+    if (tokenIn.isNative && !tokenOut.isNative) {
+      return (await pancakeRouter.swapExactETHForTokensSupportingFeeOnTransferTokens(
+        amountOutMinWei,
+        quote.pancakePath,
+        userAddress,
+        deadline,
+        { value: amountInWei }
+      )) as ethers.TransactionResponse;
+    }
+
+    if (!tokenIn.isNative && tokenOut.isNative) {
+      return (await pancakeRouter.swapExactTokensForETHSupportingFeeOnTransferTokens(
+        amountInWei,
+        amountOutMinWei,
+        quote.pancakePath,
+        userAddress,
+        deadline
+      )) as ethers.TransactionResponse;
+    }
+
+    return (await pancakeRouter.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+      amountInWei,
+      amountOutMinWei,
+      quote.pancakePath,
+      userAddress,
+      deadline
+    )) as ethers.TransactionResponse;
+  }
+
+  const router = new ethers.Contract(THENA_ROUTER_V2_ADDRESS, ROUTER_V2_ABI, signer);
 
   if (tokenIn.isNative && !tokenOut.isNative) {
     return (await router.swapExactETHForTokens(
       amountOutMinWei,
-      routes,
+      quote.routes,
       userAddress,
       deadline,
       { value: amountInWei }
@@ -379,7 +516,7 @@ export async function executeOnChainSwap(params: {
     return (await router.swapExactTokensForETH(
       amountInWei,
       amountOutMinWei,
-      routes,
+      quote.routes,
       userAddress,
       deadline
     )) as ethers.TransactionResponse;
@@ -388,7 +525,7 @@ export async function executeOnChainSwap(params: {
   return (await router.swapExactTokensForTokens(
     amountInWei,
     amountOutMinWei,
-    routes,
+    quote.routes,
     userAddress,
     deadline
   )) as ethers.TransactionResponse;

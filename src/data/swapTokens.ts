@@ -10,9 +10,12 @@ export interface SwapToken {
 export const BSC_CHAIN_ID = 56;
 export const BSC_CHAIN_ID_HEX = '0x38';
 
-// Verified THENA BNB Smart Chain (56) Contract Addresses
+// Verified BNB Smart Chain (56) Router, Factory & Token Addresses
 export const THENA_ROUTER_V2_ADDRESS = '0xd4ae6eCA985340Dd434D38F470aCCce4DC78D109';
 export const THENA_PAIR_FACTORY_ADDRESS = '0xAFD89d21BdB66d00817d4153E055830B1c2B3970';
+export const PANCAKE_ROUTER_V2_ADDRESS = '0x10ED43C718714eb63d5aA57B78B54704E256024E';
+export const PANCAKE_PAIR_FACTORY_ADDRESS = '0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73';
+export const TAMIYANOIA_ADDRESS = '0x8bea530150675c1eC537Bde45c0480164590c898';
 export const WBNB_ADDRESS = '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c';
 export const USDT_ADDRESS = '0x55d398326f99059fF775485246999027B3197955';
 
@@ -33,6 +36,13 @@ export const DEFAULT_SWAP_TOKENS: SwapToken[] = [
     isNative: true,
     logoURI:
       'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/smartchain/info/logo.png',
+  },
+  {
+    symbol: 'TAMIYANOIA',
+    name: 'TAMIYANOIA',
+    address: TAMIYANOIA_ADDRESS,
+    decimals: 18,
+    logoURI: '/assets/aistudio/tamiswap_00325eac.png',
   },
   {
     symbol: 'THE',
