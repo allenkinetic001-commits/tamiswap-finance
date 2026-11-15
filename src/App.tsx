@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ethers } from 'ethers';
 import { AnimatePresence, motion } from 'motion/react';
-import { ExternalLink, Wallet, X } from 'lucide-react';
+import { Check, Copy, ExternalLink, Wallet, X } from 'lucide-react';
 import { SwapWidget } from './components/SwapWidget';
 import { BSC_CHAIN_ID } from './data/swapTokens';
 import { ensureBscNetwork } from './utils/bscWeb3';
@@ -15,18 +15,24 @@ interface InjectedProvider extends ethers.Eip1193Provider {
   isRabby?: boolean;
   isOkxWallet?: boolean;
   isCoinbaseWallet?: boolean;
+  isSafePal?: boolean;
+  isBitKeep?: boolean;
+  isBitgetWallet?: boolean;
+  isBinance?: boolean;
+  isPhantom?: boolean;
   providers?: InjectedProvider[];
 }
 
 interface DiscoveredWallet {
   id: string;
   name: string;
+  icon?: string;
   provider: InjectedProvider;
 }
 
 interface Eip6963AnnounceEvent extends Event {
   detail: {
-    info: { uuid: string; name: string; rdns: string };
+    info: { uuid: string; name: string; rdns: string; icon?: string };
     provider: InjectedProvider;
   };
 }
@@ -36,6 +42,10 @@ function inferProviderName(p: InjectedProvider): string {
   if (p.isRabby) return 'Rabby Wallet';
   if (p.isOkxWallet) return 'OKX Wallet';
   if (p.isCoinbaseWallet) return 'Coinbase Wallet';
+  if (p.isSafePal) return 'SafePal Wallet';
+  if (p.isBitKeep || p.isBitgetWallet) return 'Bitget Wallet';
+  if (p.isBinance) return 'Binance Web3 Wallet';
+  if (p.isPhantom) return 'Phantom';
   if (p.isMetaMask) return 'MetaMask';
   return 'Browser Web3 Wallet';
 }
@@ -47,6 +57,7 @@ export default function App() {
   const [chainId, setChainId] = useState<number | null>(null);
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [walletNotice, setWalletNotice] = useState<string | null>(null);
+  const [copiedUrl, setCopiedUrl] = useState(false);
   const [isRedMode, setIsRedMode] = useState<boolean>(false);
 
   useEffect(() => {
@@ -57,7 +68,7 @@ export default function App() {
     }
   }, []);
 
-  // Discover EIP-6963 wallets asynchronously + window.trustwallet / window.ethereum
+  // Discover EIP-6963 wallets asynchronously + injected browser/mobile wallet globals
   useEffect(() => {
     const map = new Map<string, DiscoveredWallet>();
 
@@ -66,17 +77,31 @@ export default function App() {
       setWallets(list);
     };
 
-    function addCandidate(id: string, name: string, provider: InjectedProvider) {
+    function addCandidate(
+      id: string,
+      name: string,
+      provider: InjectedProvider,
+      icon?: string
+    ) {
       if (!provider || typeof provider.request !== 'function') return;
+      const alreadyHasProvider = Array.from(map.values()).some(
+        (existing) => existing.provider === provider
+      );
+      if (alreadyHasProvider) return;
       if (!map.has(id)) {
-        map.set(id, { id, name, provider });
+        map.set(id, { id, name, icon, provider });
       }
     }
 
     function onAnnounce(event: Event) {
       const e = event as Eip6963AnnounceEvent;
       if (e.detail?.provider && e.detail?.info) {
-        addCandidate(e.detail.info.rdns || e.detail.info.uuid, e.detail.info.name, e.detail.provider);
+        addCandidate(
+          e.detail.info.rdns || e.detail.info.uuid,
+          e.detail.info.name,
+          e.detail.provider,
+          e.detail.info.icon
+        );
         syncFromMap();
       }
     }
@@ -87,10 +112,30 @@ export default function App() {
     const win = window as unknown as {
       ethereum?: InjectedProvider;
       trustwallet?: InjectedProvider;
+      okxwallet?: InjectedProvider;
+      safepalProvider?: InjectedProvider;
+      BinanceChain?: InjectedProvider;
+      bitkeep?: { ethereum?: InjectedProvider };
+      phantom?: { ethereum?: InjectedProvider };
     };
 
     if (win.trustwallet) {
       addCandidate('trustwallet-global', 'Trust Wallet', win.trustwallet);
+    }
+    if (win.okxwallet) {
+      addCandidate('okxwallet-global', 'OKX Wallet', win.okxwallet);
+    }
+    if (win.safepalProvider) {
+      addCandidate('safepal-global', 'SafePal Wallet', win.safepalProvider);
+    }
+    if (win.bitkeep?.ethereum) {
+      addCandidate('bitget-global', 'Bitget Wallet', win.bitkeep.ethereum);
+    }
+    if (win.BinanceChain) {
+      addCandidate('binance-global', 'Binance Web3 Wallet', win.BinanceChain);
+    }
+    if (win.phantom?.ethereum) {
+      addCandidate('phantom-global', 'Phantom', win.phantom.ethereum);
     }
     if (win.ethereum) {
       if (Array.isArray(win.ethereum.providers) && win.ethereum.providers.length > 0) {
@@ -182,10 +227,6 @@ export default function App() {
 
   function handleConnectButton() {
     setWalletNotice(null);
-    if (wallets.length === 1) {
-      connectWithProvider(wallets[0].provider);
-      return;
-    }
     setShowWalletModal(true);
   }
 
@@ -210,13 +251,67 @@ export default function App() {
     setShowWalletModal(false);
   }
 
+  async function handleCopySiteUrl() {
+    if (typeof window === 'undefined') return;
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopiedUrl(true);
+      setTimeout(() => setCopiedUrl(false), 2000);
+    } catch {
+      // ignore clipboard restrictions
+    }
+  }
+
   const wrongNetwork = Boolean(walletAddress) && chainId !== null && chainId !== BSC_CHAIN_ID;
-  const trustDeepLink =
+  const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
+  const dappHostPath =
     typeof window !== 'undefined'
-      ? `https://link.trustwallet.com/open_url?coin_id=20000714&url=${encodeURIComponent(
-          window.location.href
-        )}`
-      : '#';
+      ? `${window.location.host}${window.location.pathname}${window.location.search}`
+      : '';
+  const mobileWalletLinks = currentUrl
+    ? [
+        {
+          id: 'metamask',
+          name: 'MetaMask',
+          badge: 'Popular',
+          href: `https://metamask.app.link/dapp/${dappHostPath}`,
+        },
+        {
+          id: 'trustwallet',
+          name: 'Trust Wallet',
+          badge: 'Mobile',
+          href: `https://link.trustwallet.com/open_url?coin_id=20000714&url=${encodeURIComponent(
+            currentUrl
+          )}`,
+        },
+        {
+          id: 'okx',
+          name: 'OKX Wallet',
+          badge: 'Mobile',
+          href: `https://www.okx.com/download?deeplink=${encodeURIComponent(
+            `okx://wallet/dapp/url?dappUrl=${encodeURIComponent(currentUrl)}`
+          )}`,
+        },
+        {
+          id: 'coinbase',
+          name: 'Coinbase Wallet',
+          badge: 'Mobile',
+          href: `https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(currentUrl)}`,
+        },
+        {
+          id: 'safepal',
+          name: 'SafePal Wallet',
+          badge: 'Mobile',
+          href: `https://link.safepal.io/open_url?url=${encodeURIComponent(currentUrl)}`,
+        },
+        {
+          id: 'bitget',
+          name: 'Bitget Wallet',
+          badge: 'Mobile',
+          href: `https://bkcode.vip?action=dapp&url=${encodeURIComponent(currentUrl)}`,
+        },
+      ]
+    : [];
 
   const svgColors = isRedMode
     ? {
@@ -659,7 +754,7 @@ export default function App() {
                     }`}
                   >
                     <h2 className="font-display chrome-text text-sm font-bold tracking-widest uppercase">
-                      {walletAddress ? 'Connected Wallet' : 'Connect DEX Wallet'}
+                      {walletAddress ? 'Connected Wallet' : 'Connect Wallet'}
                     </h2>
                     <button
                       type="button"
@@ -696,40 +791,98 @@ export default function App() {
                         Disconnect Wallet
                       </button>
                     </div>
-                  ) : wallets.length > 0 ? (
-                    <div className="space-y-2.5">
-                      {wallets.map((w) => (
-                        <button
-                          key={w.id}
-                          type="button"
-                          onClick={() => connectWithProvider(w.provider)}
-                          className="combat-steel-btn flex w-full items-center justify-between px-4 py-3 text-left text-xs font-semibold text-slate-100"
-                        >
-                          <span className="tracking-wide">{w.name}</span>
-                          <span
-                            className={`font-mono text-[11px] ${
-                              isRedMode ? 'text-red-300' : 'text-cyan-300'
-                            }`}
-                          >
-                            Detected
-                          </span>
-                        </button>
-                      ))}
-                    </div>
                   ) : (
-                    <div className="space-y-3.5 text-xs">
-                      <p className="leading-relaxed text-slate-300">
-                        No browser wallet detected in this window. On mobile, open this URL directly inside Trust Wallet&apos;s built-in DApp browser, or use a desktop extension (Trust Wallet, MetaMask, Rabby).
-                      </p>
-                      <a
-                        href={trustDeepLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="combat-energy-btn flex w-full items-center justify-center gap-2 px-4 py-3 font-display text-xs font-bold tracking-wider text-white uppercase drop-shadow-[0_1px_2px_rgba(2,6,23,0.9)]"
+                    <div className="space-y-3.5">
+                      {wallets.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="font-mono text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
+                            Detected Browser Wallets
+                          </div>
+                          {wallets.map((w) => (
+                            <button
+                              key={w.id}
+                              type="button"
+                              onClick={() => connectWithProvider(w.provider)}
+                              className="combat-steel-btn flex w-full items-center justify-between px-3.5 py-2.5 text-left text-xs font-semibold text-slate-100"
+                            >
+                              <span className="flex items-center gap-2.5">
+                                {w.icon ? (
+                                  <img
+                                    src={w.icon}
+                                    alt={w.name}
+                                    width={20}
+                                    height={20}
+                                    className="h-5 w-5 rounded-full object-contain"
+                                  />
+                                ) : (
+                                  <Wallet
+                                    className={`h-4 w-4 ${
+                                      isRedMode ? 'text-red-300' : 'text-cyan-300'
+                                    }`}
+                                  />
+                                )}
+                                <span className="tracking-wide">{w.name}</span>
+                              </span>
+                              <span
+                                className={`font-mono text-[11px] ${
+                                  isRedMode ? 'text-red-300' : 'text-cyan-300'
+                                }`}
+                              >
+                                Connect
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="space-y-2">
+                        <div className="font-mono text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
+                          {wallets.length > 0
+                            ? 'Or Open in Mobile Wallet App'
+                            : 'Open in Any Mobile Wallet App'}
+                        </div>
+                        {wallets.length === 0 && (
+                          <p className="text-xs leading-relaxed text-slate-300">
+                            Choose a mobile wallet app to open this DEX directly, or connect using a desktop browser extension (MetaMask, Rabby, OKX, Trust Wallet, Coinbase).
+                          </p>
+                        )}
+                        <div className="grid grid-cols-2 gap-2">
+                          {mobileWalletLinks.map((wallet) => (
+                            <a
+                              key={wallet.id}
+                              href={wallet.href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="combat-steel-btn flex items-center justify-between px-3 py-2.5 text-xs font-semibold text-slate-100"
+                            >
+                              <span className="truncate">{wallet.name}</span>
+                              <ExternalLink
+                                className={`h-3 w-3 shrink-0 ${
+                                  isRedMode ? 'text-red-300' : 'text-cyan-300'
+                                }`}
+                              />
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleCopySiteUrl}
+                        className="combat-energy-btn flex w-full items-center justify-center gap-2 px-4 py-2.5 font-display text-[11px] font-bold tracking-wider text-white uppercase drop-shadow-[0_1px_2px_rgba(2,6,23,0.9)]"
                       >
-                        <span>Open in Trust Wallet App</span>
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
+                        {copiedUrl ? (
+                          <>
+                            <Check className="h-3.5 w-3.5" />
+                            <span>DApp Link Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3.5 w-3.5" />
+                            <span>Copy URL for Other Wallets</span>
+                          </>
+                        )}
+                      </button>
                     </div>
                   )}
                 </div>

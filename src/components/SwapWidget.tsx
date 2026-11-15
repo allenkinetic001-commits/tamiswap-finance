@@ -903,7 +903,7 @@ export function SwapWidget({
                   isRedMode ? 'text-rose-100' : 'text-cyan-100'
                 }`}
               />
-              <span>Connect Trust Wallet / Web3</span>
+              <span>Connect Wallet</span>
             </button>
           ) : wrongNetwork ? (
             <button
