@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ethers } from 'ethers';
 import { AnimatePresence, motion } from 'motion/react';
 import {
@@ -16,7 +16,6 @@ import {
   BSC_CHAIN_ID,
   DEFAULT_SWAP_TOKENS,
   SwapToken,
-  TAMIYANOIA_ADDRESS,
   THENA_ROUTER_V2_ADDRESS,
 } from '../data/swapTokens';
 import {
@@ -32,12 +31,18 @@ import { TokenLogo } from './TokenLogo';
 
 type RouteMode = 'auto' | 'volatile' | 'stable';
 
+export interface ExternalTokenSelection {
+  token: SwapToken;
+  nonce: number;
+}
+
 interface SwapWidgetProps {
   walletAddress: string | null;
   chainId: number | null;
   provider: ethers.Eip1193Provider | null;
   onConnectWallet: () => void;
   onSwitchToBsc: () => void;
+  selectedTokenRequest?: ExternalTokenSelection | null;
   isRedMode?: boolean;
 }
 
@@ -62,6 +67,7 @@ export function SwapWidget({
   provider,
   onConnectWallet,
   onSwitchToBsc,
+  selectedTokenRequest = null,
   isRedMode = false,
 }: SwapWidgetProps) {
   const [tokens, setTokens] = useState<SwapToken[]>(DEFAULT_SWAP_TOKENS);
@@ -105,6 +111,45 @@ export function SwapWidget({
     () => tokens.find((t) => t.symbol === tokenOutSymbol) || tokens[1],
     [tokens, tokenOutSymbol]
   );
+
+  const tokensRef = useRef(tokens);
+  tokensRef.current = tokens;
+
+  // Sync when user clicks a token in Top 10 Tokens view
+  useEffect(() => {
+    if (!selectedTokenRequest) return;
+    const incoming = selectedTokenRequest.token;
+
+    const existing = tokensRef.current.find((t) =>
+      incoming.isNative
+        ? Boolean(t.isNative)
+        : !t.isNative && t.address.toLowerCase() === incoming.address.toLowerCase()
+    );
+
+    const targetSymbol = existing ? existing.symbol : incoming.symbol;
+    if (!existing) {
+      setTokens((prev) => {
+        if (
+          prev.some((t) =>
+            incoming.isNative
+              ? Boolean(t.isNative)
+              : !t.isNative && t.address.toLowerCase() === incoming.address.toLowerCase()
+          )
+        ) {
+          return prev;
+        }
+        return [...prev, incoming];
+      });
+    }
+
+    setTokenOutSymbol(targetSymbol);
+    setTokenInSymbol((prevIn) =>
+      prevIn === targetSymbol ? (targetSymbol === 'BNB' ? 'USDT' : 'BNB') : prevIn
+    );
+    setTxHash(null);
+    setTxError(null);
+    setTxStatusText(null);
+  }, [selectedTokenRequest]);
 
   const tokenSymbolMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -489,21 +534,31 @@ export function SwapWidget({
               <h1 className="font-display chrome-text text-2xl font-extrabold tracking-widest uppercase">
                 Swap
               </h1>
-              <a
-                href={`https://bscscan.com/token/${TAMIYANOIA_ADDRESS}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={TAMIYANOIA_ADDRESS}
-                className={`mt-1 inline-flex items-center gap-1 font-mono text-xs font-medium hover:underline ${
-                  isRedMode ? 'text-red-400' : 'text-sky-400'
-                }`}
-              >
-                <span>
-                  TAMIYANOIA · {TAMIYANOIA_ADDRESS.slice(0, 6)}...
-                  {TAMIYANOIA_ADDRESS.slice(-4)}
+              {tokenOut.isNative ? (
+                <span
+                  className={`mt-1 inline-flex items-center gap-1 font-mono text-xs font-medium ${
+                    isRedMode ? 'text-red-400' : 'text-sky-400'
+                  }`}
+                >
+                  BNB · Native Gas Token (Chain 56)
                 </span>
-                <ExternalLink className="h-3 w-3 shrink-0 opacity-80" />
-              </a>
+              ) : (
+                <a
+                  href={`https://bscscan.com/token/${tokenOut.address}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={tokenOut.address}
+                  className={`mt-1 inline-flex items-center gap-1 font-mono text-xs font-medium hover:underline ${
+                    isRedMode ? 'text-red-400' : 'text-sky-400'
+                  }`}
+                >
+                  <span>
+                    {tokenOut.symbol} · {tokenOut.address.slice(0, 6)}...
+                    {tokenOut.address.slice(-4)}
+                  </span>
+                  <ExternalLink className="h-3 w-3 shrink-0 opacity-80" />
+                </a>
+              )}
             </div>
 
             <div className="flex items-center gap-2">

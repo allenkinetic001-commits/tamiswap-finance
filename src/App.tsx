@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { ethers } from 'ethers';
 import { AnimatePresence, motion } from 'motion/react';
-import { Check, Copy, ExternalLink, Wallet, X } from 'lucide-react';
-import { SwapWidget } from './components/SwapWidget';
+import { ArrowLeftRight, BarChart3, Check, Copy, ExternalLink, Wallet, X } from 'lucide-react';
+import { ExternalTokenSelection, SwapWidget } from './components/SwapWidget';
+import { TopTokensView } from './components/TopTokensView';
 import { BSC_CHAIN_ID } from './data/swapTokens';
 import { ensureBscNetwork } from './utils/bscWeb3';
+import { TopTokenEntry, toSwapToken } from './utils/topTokens';
 
 interface InjectedProvider extends ethers.Eip1193Provider {
   on?: (event: string, listener: (...args: unknown[]) => void) => void;
@@ -90,6 +92,9 @@ export default function App() {
   const [modalNotice, setModalNotice] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [isRedMode, setIsRedMode] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<'swap' | 'top-tokens'>('swap');
+  const [selectedTokenRequest, setSelectedTokenRequest] =
+    useState<ExternalTokenSelection | null>(null);
 
   useEffect(() => {
     try {
@@ -328,6 +333,17 @@ export default function App() {
     setModalNotice(
       'DApp URL copied! Opening Binance App — go to Wallets → Web3 → Discover and paste the URL.'
     );
+  }
+
+  function handleSelectTokenForSwap(entry: TopTokenEntry) {
+    setSelectedTokenRequest({
+      token: toSwapToken(entry),
+      nonce: Date.now(),
+    });
+    setActiveTab('swap');
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }
 
   const wrongNetwork = Boolean(walletAddress) && chainId !== null && chainId !== BSC_CHAIN_ID;
@@ -765,7 +781,51 @@ export default function App() {
         </div>
       </header>
 
-      <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 py-8 sm:py-10">
+      <main className="relative z-10 flex flex-1 flex-col items-center justify-start px-4 pt-6 pb-10 sm:pt-9">
+        {/* Workspace Screen Switcher: Swap | Top 10 Tokens */}
+        <div className="armor-chassis-shell mb-5 w-full max-w-[340px]">
+          <div className="armor-well-rim">
+            <div
+              role="tablist"
+              aria-label="DEX sections"
+              className="armor-well grid grid-cols-2 gap-1.5 p-1.5"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'swap'}
+                onClick={() => setActiveTab('swap')}
+                className={`inline-flex items-center justify-center gap-2 px-3 py-2 font-display text-[11px] font-bold tracking-wider uppercase transition-all whitespace-nowrap ${
+                  activeTab === 'swap'
+                    ? 'combat-energy-btn text-white drop-shadow-[0_1px_2px_rgba(2,6,23,0.9)]'
+                    : isRedMode
+                    ? 'border border-transparent text-slate-300 hover:border-red-500/35 hover:text-white'
+                    : 'border border-transparent text-slate-300 hover:border-sky-500/35 hover:text-white'
+                }`}
+              >
+                <ArrowLeftRight className="h-3.5 w-3.5 shrink-0" />
+                <span>Swap</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'top-tokens'}
+                onClick={() => setActiveTab('top-tokens')}
+                className={`inline-flex items-center justify-center gap-2 px-3 py-2 font-display text-[11px] font-bold tracking-wider uppercase transition-all whitespace-nowrap ${
+                  activeTab === 'top-tokens'
+                    ? 'combat-energy-btn text-white drop-shadow-[0_1px_2px_rgba(2,6,23,0.9)]'
+                    : isRedMode
+                    ? 'border border-transparent text-slate-300 hover:border-red-500/35 hover:text-white'
+                    : 'border border-transparent text-slate-300 hover:border-sky-500/35 hover:text-white'
+                }`}
+              >
+                <BarChart3 className="h-3.5 w-3.5 shrink-0" />
+                <span>Top 10 Tokens</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
         {walletNotice && (
           <motion.div
             initial={{ opacity: 0, y: -6 }}
@@ -783,14 +843,25 @@ export default function App() {
             </div>
           </motion.div>
         )}
-        <SwapWidget
-          walletAddress={walletAddress}
-          chainId={chainId}
-          provider={activeProvider}
-          onConnectWallet={handleConnectButton}
-          onSwitchToBsc={handleSwitchToBsc}
-          isRedMode={isRedMode}
-        />
+
+        <div className={activeTab === 'swap' ? 'flex w-full justify-center' : 'hidden'}>
+          <SwapWidget
+            walletAddress={walletAddress}
+            chainId={chainId}
+            provider={activeProvider}
+            onConnectWallet={handleConnectButton}
+            onSwitchToBsc={handleSwitchToBsc}
+            selectedTokenRequest={selectedTokenRequest}
+            isRedMode={isRedMode}
+          />
+        </div>
+
+        {activeTab === 'top-tokens' && (
+          <TopTokensView
+            onSelectTokenForSwap={handleSelectTokenForSwap}
+            isRedMode={isRedMode}
+          />
+        )}
       </main>
 
       {/* Cybernetic Wallet Selection / Connection Modal */}
