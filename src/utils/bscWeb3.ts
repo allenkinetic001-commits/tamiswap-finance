@@ -5,6 +5,8 @@ import {
   BSC_RPC_URLS,
   PANCAKE_PAIR_FACTORY_ADDRESS,
   PANCAKE_ROUTER_V2_ADDRESS,
+  PLATFORM_FEE_BPS,
+  PLATFORM_FEE_RECIPIENT,
   SwapToken,
   THENA_PAIR_FACTORY_ADDRESS,
   THENA_ROUTER_V2_ADDRESS,
@@ -20,6 +22,34 @@ export interface RouteHop {
 
 export type DexId = 'thena' | 'pancakeswap';
 
+export interface KyberRouteHop {
+  pool: string;
+  tokenIn: string;
+  tokenOut: string;
+  swapAmount: string;
+  amountOut: string;
+  exchange: string;
+  poolExtra?: {
+    fee?: number;
+    feePrecision?: number;
+  };
+}
+
+export interface KyberRouteSummary {
+  tokenIn: string;
+  amountIn: string;
+  tokenOut: string;
+  amountOut: string;
+  gas: string;
+  route: KyberRouteHop[][];
+  extraFee?: {
+    feeAmount: string;
+    chargeFeeBy: string;
+    isInBps: boolean;
+    feeReceiver: string;
+  };
+}
+
 export interface OnChainQuote {
   dex: DexId;
   dexLabel: string;
@@ -31,8 +61,120 @@ export interface OnChainQuote {
   routeSymbols: string[];
   priceImpactPct: number;
   feeBps: number;
+  platformFeeBps: number;
+  platformFeeWei: bigint;
+  platformFeeRecipient: string;
   pairAddress: string | null;
   isWrapOrUnwrap: boolean;
+  kyberRouteSummary?: KyberRouteSummary;
+}
+
+const KYBER_NATIVE_TOKEN = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
+const KYBER_BSC_API = 'https://aggregator-api.kyberswap.com/bsc/api/v1';
+
+interface KyberRoutesResponse {
+  code: number;
+  message?: string;
+  data?: {
+    routeSummary?: KyberRouteSummary;
+    routerAddress?: string;
+  };
+}
+
+interface KyberBuildResponse {
+  code: number;
+  message?: string;
+  data?: {
+    routerAddress: string;
+    data: string;
+    amountOut: string;
+  };
+}
+
+async function fetchKyberFeeQuote(params: {
+  tokenIn: SwapToken;
+  tokenOut: SwapToken;
+  amountInWei: bigint;
+  mode: 'auto' | 'volatile' | 'stable';
+}): Promise<{ routeSummary: KyberRouteSummary; routerAddress: string } | null> {
+  const { tokenIn, tokenOut, amountInWei, mode } = params;
+  const inAddr = tokenIn.isNative ? KYBER_NATIVE_TOKEN : tokenIn.address;
+  const outAddr = tokenOut.isNative ? KYBER_NATIVE_TOKEN : tokenOut.address;
+
+  const sourceList =
+    mode === 'volatile'
+      ? ['pancake,thena', 'pancake,pancake-v3,thena,thena-fusion']
+      : mode === 'stable'
+      ? ['thena,thena-fusion,pancake-v3,pancake']
+      : ['pancake,pancake-v3,thena,thena-fusion', ''];
+
+  for (const sources of sourceList) {
+    try {
+      const qs = new URLSearchParams({
+        tokenIn: inAddr,
+        tokenOut: outAddr,
+        amountIn: amountInWei.toString(),
+        feeAmount: String(PLATFORM_FEE_BPS),
+        isInBps: 'true',
+        chargeFeeBy: 'currency_in',
+        feeReceiver: PLATFORM_FEE_RECIPIENT,
+      });
+      if (sources) {
+        qs.set('includedSources', sources);
+      }
+
+      const res = await fetch(`${KYBER_BSC_API}/routes?${qs.toString()}`, {
+        headers: { 'x-client-id': 'TamiSwap' },
+      });
+      if (!res.ok) continue;
+
+      const json = (await res.json()) as KyberRoutesResponse;
+      if (
+        json.code === 0 &&
+        json.data?.routeSummary &&
+        json.data?.routerAddress &&
+        BigInt(json.data.routeSummary.amountOut || '0') > 0n
+      ) {
+        return {
+          routeSummary: json.data.routeSummary,
+          routerAddress: ethers.getAddress(json.data.routerAddress),
+        };
+      }
+    } catch {
+      // try next source filter or direct fallback
+    }
+  }
+
+  return null;
+}
+
+function summarizeKyberExchanges(route: KyberRouteHop[][]): {
+  dex: DexId;
+  dexLabel: string;
+} {
+  const exchanges = new Set<string>();
+  for (const branch of route) {
+    for (const hop of branch) {
+      if (hop.exchange) exchanges.add(hop.exchange.toLowerCase());
+    }
+  }
+  const hasThena = Array.from(exchanges).some((e) => e.includes('thena'));
+  const hasPancake = Array.from(exchanges).some((e) => e.includes('pancake'));
+
+  if (hasThena && hasPancake) {
+    return { dex: 'thena', dexLabel: 'THENA · PancakeSwap' };
+  }
+  if (hasThena) {
+    return { dex: 'thena', dexLabel: 'THENA' };
+  }
+  if (hasPancake) {
+    const isV3 = exchanges.has('pancake-v3');
+    return {
+      dex: 'pancakeswap',
+      dexLabel: isV3 && !exchanges.has('pancake') ? 'PancakeSwap V3' : 'PancakeSwap V2',
+    };
+  }
+  return { dex: 'pancakeswap', dexLabel: 'THENA · PancakeSwap' };
 }
 
 const ERC20_ABI = [
@@ -213,6 +355,9 @@ export async function fetchOnChainQuote(params: {
       routeSymbols: [tokenIn.symbol, tokenOut.symbol],
       priceImpactPct: 0,
       feeBps: 0,
+      platformFeeBps: 0,
+      platformFeeWei: 0n,
+      platformFeeRecipient: PLATFORM_FEE_RECIPIENT,
       pairAddress: WBNB_ADDRESS,
       isWrapOrUnwrap: true,
     };
@@ -276,7 +421,7 @@ export async function fetchOnChainQuote(params: {
     | { dex: 'thena'; routes: RouteHop[]; pancakePath: string[]; outWei: bigint }
     | { dex: 'pancakeswap'; routes: RouteHop[]; pancakePath: string[]; outWei: bigint };
 
-  const [thenaResults, pancakeResults] = await Promise.all([
+  const [thenaResults, pancakeResults, kyberFeeQuote] = await Promise.all([
     Promise.all(
       thenaCandidateRoutes.map(async (routes): Promise<QuoteCandidate | null> => {
         try {
@@ -301,22 +446,29 @@ export async function fetchOnChainQuote(params: {
         }
       })
     ),
+    fetchKyberFeeQuote({ tokenIn, tokenOut, amountInWei, mode }),
   ]);
 
   const valid = [...thenaResults, ...pancakeResults].filter(
     (r): r is QuoteCandidate => r !== null
   );
-  if (valid.length === 0) return null;
+  if (valid.length === 0 && !kyberFeeQuote) return null;
 
   valid.sort((a, b) => (b.outWei > a.outWei ? 1 : b.outWei < a.outWei ? -1 : 0));
   const best = valid[0];
 
   let pairAddress: string | null = null;
-  let feeBps = best.dex === 'pancakeswap' ? 25 * (best.pancakePath.length - 1) : best.routes[0].stable ? 4 : 20;
+  let feeBps = best
+    ? best.dex === 'pancakeswap'
+      ? 25 * (best.pancakePath.length - 1)
+      : best.routes[0].stable
+      ? 4
+      : 20
+    : 25;
   let priceImpactPct = 0;
 
   try {
-    if (best.dex === 'thena') {
+    if (best && best.dex === 'thena') {
       const firstHop = best.routes[0];
       const [pAddr, feeVal] = await Promise.all([
         thenaFactory.getPair(firstHop.from, firstHop.to, firstHop.stable) as Promise<string>,
@@ -345,7 +497,7 @@ export async function fetchOnChainQuote(params: {
           priceImpactPct = 0.05;
         }
       }
-    } else {
+    } else if (best && best.dex === 'pancakeswap') {
       const pAddr = (await pancakeFactory.getPair(
         best.pancakePath[0],
         best.pancakePath[1]
@@ -375,6 +527,46 @@ export async function fetchOnChainQuote(params: {
     }
   } catch {
     // Non-fatal metadata lookup
+  }
+
+  if (kyberFeeQuote) {
+    const outWei = BigInt(kyberFeeQuote.routeSummary.amountOut);
+    const { dex, dexLabel } = summarizeKyberExchanges(kyberFeeQuote.routeSummary.route);
+    const primaryBranch = kyberFeeQuote.routeSummary.route[0] || [];
+    const kyberSymbols = [tokenIn.symbol];
+    for (let i = 0; i < primaryBranch.length; i++) {
+      const addr = primaryBranch[i].tokenOut.toLowerCase();
+      if (i === primaryBranch.length - 1) {
+        kyberSymbols.push(tokenOut.symbol);
+      } else {
+        kyberSymbols.push(
+          addr === WBNB_ADDRESS.toLowerCase()
+            ? 'WBNB'
+            : tokenSymbolMap[addr] || `${addr.slice(0, 6)}...`
+        );
+      }
+    }
+    if (kyberSymbols.length === 1) kyberSymbols.push(tokenOut.symbol);
+
+    const platformFeeWei = (amountInWei * BigInt(PLATFORM_FEE_BPS)) / 10000n;
+    return {
+      dex,
+      dexLabel,
+      routerAddress: kyberFeeQuote.routerAddress,
+      amountOutWei: outWei,
+      amountOutFormatted: ethers.formatUnits(outWei, tokenOut.decimals),
+      routes: best?.routes || [],
+      pancakePath: best?.pancakePath || [],
+      routeSymbols: kyberSymbols,
+      priceImpactPct,
+      feeBps,
+      platformFeeBps: PLATFORM_FEE_BPS,
+      platformFeeWei,
+      platformFeeRecipient: PLATFORM_FEE_RECIPIENT,
+      pairAddress,
+      isWrapOrUnwrap: false,
+      kyberRouteSummary: kyberFeeQuote.routeSummary,
+    };
   }
 
   const routeSymbols = [tokenIn.symbol];
@@ -410,6 +602,9 @@ export async function fetchOnChainQuote(params: {
     routeSymbols,
     priceImpactPct,
     feeBps,
+    platformFeeBps: 0,
+    platformFeeWei: 0n,
+    platformFeeRecipient: PLATFORM_FEE_RECIPIENT,
     pairAddress,
     isWrapOrUnwrap: false,
   };
@@ -437,6 +632,7 @@ export async function executeOnChainSwap(params: {
   amountOutMinWei: bigint;
   quote: OnChainQuote;
   deadlineMinutes: number;
+  slippagePct?: number;
 }): Promise<ethers.TransactionResponse> {
   const {
     ethereum,
@@ -446,6 +642,7 @@ export async function executeOnChainSwap(params: {
     amountOutMinWei,
     quote,
     deadlineMinutes,
+    slippagePct,
   } = params;
 
   await ensureBscNetwork(ethereum);
@@ -463,6 +660,42 @@ export async function executeOnChainSwap(params: {
   }
 
   const deadline = BigInt(Math.floor(Date.now() / 1000) + deadlineMinutes * 60);
+
+  if (quote.kyberRouteSummary) {
+    const computedBps =
+      slippagePct !== undefined
+        ? Math.round(slippagePct * 100)
+        : quote.amountOutWei > 0n
+        ? Number(((quote.amountOutWei - amountOutMinWei) * 10000n) / quote.amountOutWei)
+        : 50;
+    const slippageTolerance = Math.max(5, Math.min(2000, computedBps));
+
+    const buildRes = await fetch(`${KYBER_BSC_API}/route/build`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-client-id': 'TamiSwap',
+      },
+      body: JSON.stringify({
+        routeSummary: quote.kyberRouteSummary,
+        sender: userAddress,
+        recipient: userAddress,
+        slippageTolerance,
+        deadline: Number(deadline),
+      }),
+    });
+
+    const built = (await buildRes.json()) as KyberBuildResponse;
+    if (!buildRes.ok || built.code !== 0 || !built.data?.data || !built.data?.routerAddress) {
+      throw new Error(built.message || 'Unable to build swap transaction with platform fee.');
+    }
+
+    return await signer.sendTransaction({
+      to: ethers.getAddress(built.data.routerAddress),
+      data: built.data.data,
+      value: tokenIn.isNative ? amountInWei : 0n,
+    });
+  }
 
   if (quote.dex === 'pancakeswap') {
     const pancakeRouter = new ethers.Contract(

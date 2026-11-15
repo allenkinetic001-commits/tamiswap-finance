@@ -413,6 +413,7 @@ export function SwapWidget({
         amountOutMinWei: minReceivedWei,
         quote,
         deadlineMinutes: deadlineMin,
+        slippagePct,
       });
       setTxHash(tx.hash);
       setTxStatusText('Transaction submitted — waiting for BNB Chain confirmation...');
@@ -923,6 +924,19 @@ export function SwapWidget({
                   {(quote.feeBps / 100).toFixed(2)}%
                 </span>
               </div>
+              {quote.platformFeeBps > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">
+                    Platform fee ({(quote.platformFeeBps / 100).toFixed(2)}%)
+                  </span>
+                  <span className="font-mono text-slate-300 tabular-nums">
+                    {formatDisplayAmount(
+                      ethers.formatUnits(quote.platformFeeWei, tokenIn.decimals)
+                    )}{' '}
+                    {tokenIn.symbol}
+                  </span>
+                </div>
+              )}
               <div className="flex items-center justify-between gap-2">
                 <span className="shrink-0 text-slate-400">On-chain route</span>
                 <span className={`truncate text-right font-mono ${isRedMode ? 'text-rose-200' : 'text-cyan-200'}`}>
