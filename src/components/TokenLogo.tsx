@@ -41,6 +41,23 @@ const SYMBOL_LOGO_FALLBACKS: Record<string, string[]> = {
     'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/smartchain/assets/0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82/logo.png',
     'https://coin-images.coingecko.com/coins/images/12632/small/pancakeswap-cake-logo_%281%29.png',
   ],
+  GTAN: [
+    'https://coin-images.coingecko.com/coins/images/68338/small/Giant_GTAN_200_logo.png?1755409446',
+    'https://cdn.dexscreener.com/cms/images/50123949bedca2c0a1a6d6ce595d8c5edb2c6f36e8c3ac0988fc4275ebee0581?width=800&height=800&quality=95&format=auto',
+  ],
+  OCICAT: [
+    'https://coin-images.coingecko.com/coins/images/36556/small/OCICAT.jpg?1711899902',
+    'https://cdn.dexscreener.com/cms/images/78e8f2c404d8d98757193a6292d1e5018f79f23bd22f7d721db76fb3ccb0b335?width=800&height=800&quality=95&format=auto',
+  ],
+  TART: [
+    'https://cdn.dexscreener.com/cms/images/kDVz5vcKSnLS1iEe?width=800&height=800&quality=95&format=auto',
+    'https://coin-images.coingecko.com/coins/images/102178785/large/tart.jpg',
+  ],
+  WKC: [
+    'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/smartchain/assets/0x6Ec90334d89dBdc89E08A133271be3d104128Edb/logo.png',
+    'https://coin-images.coingecko.com/coins/images/26037/large/Wiki-Logo.png',
+    'https://cdn.dexscreener.com/cms/images/6012b7aeac14fd99318f10747e4deb40c0de61588e12e873621e354f4033a513?width=800&height=800&quality=95&format=auto',
+  ],
 };
 
 function BuiltInVectorFallback({ symbol, size }: { symbol: string; size: number }) {

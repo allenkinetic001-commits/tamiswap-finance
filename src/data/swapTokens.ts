@@ -105,4 +105,36 @@ export const DEFAULT_SWAP_TOKENS: SwapToken[] = [
     logoURI:
       'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/smartchain/assets/0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82/logo.png',
   },
+  {
+    symbol: 'GTAN',
+    name: 'GIANT',
+    address: '0xbD7909318b9Ca4ff140B840F69bB310a785d1095',
+    decimals: 9,
+    logoURI:
+      'https://coin-images.coingecko.com/coins/images/68338/small/Giant_GTAN_200_logo.png?1755409446',
+  },
+  {
+    symbol: 'Ocicat',
+    name: 'Ocicat',
+    address: '0xE53D384Cf33294C1882227ae4f90D64cF2a5dB70',
+    decimals: 6,
+    logoURI:
+      'https://coin-images.coingecko.com/coins/images/36556/small/OCICAT.jpg?1711899902',
+  },
+  {
+    symbol: 'TART',
+    name: 'TartSwap',
+    address: '0x7AB8d02CBb51Ff7223fDe700eAaa2a91Bf750314',
+    decimals: 9,
+    logoURI:
+      'https://cdn.dexscreener.com/cms/images/kDVz5vcKSnLS1iEe?width=800&height=800&quality=95&format=auto',
+  },
+  {
+    symbol: 'WKC',
+    name: 'WIKI CAT',
+    address: '0x6Ec90334d89dBdc89E08A133271be3d104128Edb',
+    decimals: 18,
+    logoURI:
+      'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/smartchain/assets/0x6Ec90334d89dBdc89E08A133271be3d104128Edb/logo.png',
+  },
 ];
