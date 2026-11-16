@@ -50,8 +50,10 @@ function formatDisplayAmount(rawStr: string, maxDecimals = 6): string {
   const num = Number(rawStr);
   if (!Number.isFinite(num) || num === 0) return '0';
   if (num < 0.000001) return '<0.000001';
+  const fractionDigits =
+    num >= 1_000_000 ? 0 : num >= 1_000 ? 2 : num >= 1 ? 4 : maxDecimals;
   return num.toLocaleString(undefined, {
-    maximumFractionDigits: num < 1 ? maxDecimals : 4,
+    maximumFractionDigits: fractionDigits,
   });
 }
 
@@ -724,8 +726,8 @@ export function SwapWidget({
 
           {/* You Pay Chamber */}
           <div className="armor-well-rim relative z-10">
-            <div className="armor-well p-4 sm:p-5">
-              <div className="mb-3 flex items-center justify-between text-xs">
+            <div className="armor-well p-3.5 sm:p-5">
+              <div className="mb-2.5 sm:mb-3 flex items-center justify-between text-xs">
                 <span className="font-display text-[11px] font-bold tracking-widest text-slate-200 uppercase">
                   You pay
                 </span>
@@ -760,7 +762,7 @@ export function SwapWidget({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center justify-between gap-2 sm:gap-3">
                 <input
                   type="number"
                   min="0"
@@ -773,18 +775,24 @@ export function SwapWidget({
                     setTxStatusText(null);
                   }}
                   placeholder="0.0"
-                  className="min-w-0 flex-1 bg-transparent font-mono text-2xl sm:text-[28px] font-bold text-white placeholder-slate-600 tabular-nums focus:outline-none"
+                  className={`min-w-0 flex-1 bg-transparent font-mono font-bold text-white placeholder-slate-600 tabular-nums focus:outline-none ${
+                    amountInStr.length > 14
+                      ? 'text-sm sm:text-xl'
+                      : amountInStr.length > 9
+                      ? 'text-base sm:text-2xl'
+                      : 'text-lg sm:text-[26px]'
+                  }`}
                 />
                 <button
                   type="button"
                   onClick={() => setSelectorSide('in')}
-                  className="combat-steel-btn inline-flex shrink-0 items-center gap-1.5 sm:gap-2.5 px-2.5 sm:px-3.5 py-2 text-xs sm:text-sm font-bold tracking-wider text-white whitespace-nowrap"
+                  className="combat-steel-btn inline-flex shrink-0 items-center gap-1.5 sm:gap-2.5 px-2 sm:px-3.5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold tracking-wider text-white whitespace-nowrap"
                 >
-                  <TokenLogo token={tokenIn} size={22} />
+                  <TokenLogo token={tokenIn} size={20} />
                   <span className="font-sans text-xs sm:text-sm font-bold tracking-wide text-white">
                     {tokenIn.symbol}
                   </span>
-                  <ChevronDown className={`h-4 w-4 ${isGreenMode ? 'text-emerald-300' : 'text-sky-300'}`} />
+                  <ChevronDown className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${isGreenMode ? 'text-emerald-300' : 'text-sky-300'}`} />
                 </button>
               </div>
             </div>
@@ -816,8 +824,8 @@ export function SwapWidget({
 
           {/* You Receive Chamber */}
           <div className="armor-well-rim relative z-10">
-            <div className="armor-well p-4 sm:p-5">
-              <div className="mb-3 flex items-center justify-between text-xs">
+            <div className="armor-well p-3.5 sm:p-5">
+              <div className="mb-2.5 sm:mb-3 flex items-center justify-between text-xs">
                 <span className="font-display text-[11px] font-bold tracking-widest text-slate-200 uppercase">
                   You receive
                 </span>
@@ -826,49 +834,58 @@ export function SwapWidget({
                 </span>
               </div>
 
-              <div className="flex items-center justify-between gap-3">
-                <div
-                  title={quote ? quote.amountOutFormatted : undefined}
-                  className={`min-w-0 flex-1 truncate font-mono font-bold text-white tabular-nums ${
-                    quote && formatDisplayAmount(quote.amountOutFormatted).length > 13
-                      ? 'text-lg sm:text-2xl'
-                      : 'text-2xl sm:text-[28px]'
-                  }`}
-                >
-                  {quoting && amountInWei > 0n ? (
-                    <span
-                      className={`inline-flex items-center gap-2 text-base font-medium ${
-                        isGreenMode ? 'text-emerald-300' : 'text-cyan-300'
-                      }`}
+              <div className="flex items-center justify-between gap-2 sm:gap-3">
+                {(() => {
+                  const formattedOut = quote ? formatDisplayAmount(quote.amountOutFormatted) : '';
+                  const outSizeClass =
+                    formattedOut.length > 15
+                      ? 'text-[13px] sm:text-xl'
+                      : formattedOut.length > 11
+                      ? 'text-[15px] sm:text-2xl'
+                      : formattedOut.length > 8
+                      ? 'text-base sm:text-2xl'
+                      : 'text-lg sm:text-[26px]';
+                  return (
+                    <div
+                      title={quote ? quote.amountOutFormatted : undefined}
+                      className={`min-w-0 flex-1 truncate font-mono font-bold text-white tabular-nums ${outSizeClass}`}
                     >
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Quoting BSC...</span>
-                    </span>
-                  ) : quote ? (
-                    <span
-                      className={`text-white ${
-                        isGreenMode
-                          ? 'drop-shadow-[0_0_10px_rgba(16,185,129,0.35)]'
-                          : 'drop-shadow-[0_0_10px_rgba(56,189,248,0.3)]'
-                      }`}
-                    >
-                      {formatDisplayAmount(quote.amountOutFormatted)}
-                    </span>
-                  ) : (
-                    <span className="text-slate-600">0.0</span>
-                  )}
-                </div>
+                      {quoting && amountInWei > 0n ? (
+                        <span
+                          className={`inline-flex items-center gap-2 text-sm sm:text-base font-medium ${
+                            isGreenMode ? 'text-emerald-300' : 'text-cyan-300'
+                          }`}
+                        >
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>Quoting BSC...</span>
+                        </span>
+                      ) : quote ? (
+                        <span
+                          className={`text-white ${
+                            isGreenMode
+                              ? 'drop-shadow-[0_0_10px_rgba(16,185,129,0.35)]'
+                              : 'drop-shadow-[0_0_10px_rgba(56,189,248,0.3)]'
+                          }`}
+                        >
+                          {formattedOut}
+                        </span>
+                      ) : (
+                        <span className="text-slate-600">0.0</span>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 <button
                   type="button"
                   onClick={() => setSelectorSide('out')}
-                  className="combat-steel-btn inline-flex shrink-0 items-center gap-1.5 sm:gap-2.5 px-2.5 sm:px-3.5 py-2 text-xs sm:text-sm font-bold tracking-wider text-white whitespace-nowrap"
+                  className="combat-steel-btn inline-flex shrink-0 items-center gap-1.5 sm:gap-2.5 px-2 sm:px-3.5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold tracking-wider text-white whitespace-nowrap"
                 >
-                  <TokenLogo token={tokenOut} size={22} />
+                  <TokenLogo token={tokenOut} size={20} />
                   <span className="font-sans text-xs sm:text-sm font-bold tracking-wide text-white">
                     {tokenOut.symbol}
                   </span>
-                  <ChevronDown className={`h-4 w-4 ${isGreenMode ? 'text-emerald-300' : 'text-sky-300'}`} />
+                  <ChevronDown className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${isGreenMode ? 'text-emerald-300' : 'text-sky-300'}`} />
                 </button>
               </div>
             </div>
@@ -881,21 +898,21 @@ export function SwapWidget({
                 isGreenMode ? 'border-emerald-400/25' : 'border-sky-400/25'
               }`}
             >
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
                 <span className="text-slate-400">Rate</span>
-                <span className="font-mono text-slate-100 tabular-nums">
+                <span className="font-mono text-[11px] sm:text-xs text-slate-100 tabular-nums">
                   1 {tokenIn.symbol} ={' '}
                   {exchangeRate.toLocaleString(undefined, {
-                    maximumFractionDigits: exchangeRate < 1 ? 6 : 4,
+                    maximumFractionDigits: exchangeRate >= 1_000_000 ? 0 : exchangeRate < 1 ? 6 : 4,
                   })}{' '}
                   {tokenOut.symbol}
                 </span>
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
                 <span className="text-slate-400">
                   Minimum received ({slippagePct}% slippage)
                 </span>
-                <span className={`font-mono tabular-nums ${isGreenMode ? 'text-emerald-200' : 'text-cyan-200'}`}>
+                <span className={`font-mono text-[11px] sm:text-xs tabular-nums ${isGreenMode ? 'text-emerald-200' : 'text-cyan-200'}`}>
                   {formatDisplayAmount(
                     ethers.formatUnits(minReceivedWei, tokenOut.decimals)
                   )}{' '}
