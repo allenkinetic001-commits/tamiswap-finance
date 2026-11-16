@@ -5,7 +5,7 @@ import { ArrowLeftRight, BarChart3, Check, Copy, ExternalLink, Wallet, X } from 
 import { ExternalTokenSelection, SwapWidget } from './components/SwapWidget';
 import { TopTokensView } from './components/TopTokensView';
 import { BSC_CHAIN_ID } from './data/swapTokens';
-import { ensureBscNetwork } from './utils/bscWeb3';
+import { ensureBscNetwork, parseChainId } from './utils/bscWeb3';
 import { TopTokenEntry, toSwapToken } from './utils/topTokens';
 
 interface InjectedProvider extends ethers.Eip1193Provider {
@@ -214,10 +214,22 @@ export default function App() {
             if (accs && accs[0]) {
               setActiveProvider(candidate.provider);
               setWalletAddress(ethers.getAddress(accs[0]));
-              const hex = (await candidate.provider.request({
+              const hex = await candidate.provider.request({
                 method: 'eth_chainId',
-              })) as string;
-              setChainId(parseInt(hex, 16));
+              });
+              let restoredChain = parseChainId(hex);
+              if (restoredChain !== BSC_CHAIN_ID) {
+                try {
+                  await ensureBscNetwork(candidate.provider);
+                  const updatedHex = await candidate.provider.request({
+                    method: 'eth_chainId',
+                  });
+                  restoredChain = parseChainId(updatedHex);
+                } catch {
+                  // Keep restored chain accurate so Switch to BNB Chain button appears
+                }
+              }
+              setChainId(restoredChain);
               break;
             }
           } catch {
@@ -242,8 +254,9 @@ export default function App() {
     }
 
     function handleChainChanged(hex: unknown) {
-      if (typeof hex === 'string') {
-        setChainId(parseInt(hex, 16));
+      const parsed = parseChainId(hex);
+      if (parsed !== null) {
+        setChainId(parsed);
       }
     }
 
@@ -266,10 +279,28 @@ export default function App() {
         setActiveProvider(chosen);
         setWalletAddress(ethers.getAddress(accounts[0]));
       }
+
+      // Record initial chainId immediately so it is never stuck null if BSC switch is cancelled
+      try {
+        const initialHex = await chosen.request({ method: 'eth_chainId' });
+        setChainId(parseChainId(initialHex));
+      } catch {
+        // ignore pre-read failure
+      }
+
       await ensureBscNetwork(chosen);
-      const hex = (await chosen.request({ method: 'eth_chainId' })) as string;
-      setChainId(parseInt(hex, 16));
+
+      const finalHex = await chosen.request({ method: 'eth_chainId' });
+      const finalChain = parseChainId(finalHex);
+      setChainId(finalChain);
     } catch (err: unknown) {
+      try {
+        const currentHex = await chosen.request({ method: 'eth_chainId' });
+        const currentChain = parseChainId(currentHex);
+        if (currentChain !== null) setChainId(currentChain);
+      } catch {
+        // ignore read failure
+      }
       const msg =
         err instanceof Error
           ? err.message
@@ -294,8 +325,8 @@ export default function App() {
     setWalletNotice(null);
     try {
       await ensureBscNetwork(activeProvider);
-      const hex = (await activeProvider.request({ method: 'eth_chainId' })) as string;
-      setChainId(parseInt(hex, 16));
+      const hex = await activeProvider.request({ method: 'eth_chainId' });
+      setChainId(parseChainId(hex));
     } catch (err: unknown) {
       setWalletNotice(
         err instanceof Error ? err.message : 'Could not switch network to BNB Smart Chain.'
@@ -361,6 +392,15 @@ export default function App() {
           icon: '/assets/wallets/metamask.png',
           iconBg: 'bg-white',
           href: `https://metamask.app.link/dapp/${dappHostPath}`,
+        },
+        {
+          id: 'trust',
+          name: 'Trust Wallet',
+          icon: '/assets/wallets/trustwallet.png',
+          iconBg: 'bg-white',
+          href: `https://link.trustwallet.com/open_url?coin_id=20000714&url=${encodeURIComponent(
+            currentUrl
+          )}`,
         },
         {
           id: 'binance',
@@ -772,10 +812,10 @@ export default function App() {
               />
               <span className="chrome-text">
                 {wrongNetwork
-                  ? 'Switch to BSC (56)'
+                  ? 'Switch to BNB Chain'
                   : walletAddress
                   ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
-                  : 'Connect Wallet'}
+                  : 'Connect BNB Wallet'}
               </span>
             </button>
           </div>
@@ -898,7 +938,7 @@ export default function App() {
                     }`}
                   >
                     <h2 className="font-display chrome-text text-sm font-bold tracking-widest uppercase">
-                      {walletAddress ? 'Connected Wallet' : 'Connect Wallet'}
+                      {walletAddress ? 'BNB Chain Wallet' : 'Connect to BNB Chain'}
                     </h2>
                     <button
                       type="button"
@@ -917,16 +957,31 @@ export default function App() {
                         <div className="armor-well p-3.5">
                           <div
                             className={`text-xs font-semibold tracking-wider uppercase ${
-                              isGreenMode ? 'text-emerald-300' : 'text-sky-300'
+                              wrongNetwork
+                                ? 'text-amber-300'
+                                : isGreenMode
+                                ? 'text-emerald-300'
+                                : 'text-sky-300'
                             }`}
                           >
-                            Active Address (BNB Chain)
+                            {wrongNetwork
+                              ? `Wrong Network (Chain ${chainId}) — Switch to BNB Smart Chain (56)`
+                              : 'Active Address · BNB Smart Chain (56)'}
                           </div>
                           <div className="mt-1.5 font-mono text-xs break-all text-slate-100">
                             {walletAddress}
                           </div>
                         </div>
                       </div>
+                      {wrongNetwork && (
+                        <button
+                          type="button"
+                          onClick={handleSwitchToBsc}
+                          className="combat-energy-btn font-display w-full py-2.5 text-xs font-bold tracking-wider text-white uppercase"
+                        >
+                          Switch to BNB Smart Chain (56)
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={handleDisconnect}

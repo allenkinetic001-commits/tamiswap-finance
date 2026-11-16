@@ -262,9 +262,45 @@ export async function getBscReadProvider(): Promise<ethers.JsonRpcProvider> {
   });
 }
 
+export function parseChainId(rawChainId: unknown): number | null {
+  if (typeof rawChainId === 'number' && Number.isFinite(rawChainId)) {
+    return rawChainId;
+  }
+  if (typeof rawChainId === 'string') {
+    const trimmed = rawChainId.trim();
+    if (!trimmed) return null;
+    const parsed = trimmed.startsWith('0x') || trimmed.startsWith('0X')
+      ? parseInt(trimmed, 16)
+      : Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function extractWalletErrorCode(err: unknown): number | undefined {
+  if (!err || typeof err !== 'object') return undefined;
+  const e = err as {
+    code?: unknown;
+    data?: { originalError?: { code?: unknown }; code?: unknown };
+    cause?: { code?: unknown };
+  };
+  if (typeof e.code === 'number') return e.code;
+  if (typeof e.data?.originalError?.code === 'number') return e.data.originalError.code;
+  if (typeof e.data?.code === 'number') return e.data.code;
+  if (typeof e.cause?.code === 'number') return e.cause.code;
+  return undefined;
+}
+
+function isUserRejectedWalletError(err: unknown): boolean {
+  const code = extractWalletErrorCode(err);
+  if (code === 4001) return true;
+  const msg = err instanceof Error ? err.message.toLowerCase() : String(err || '').toLowerCase();
+  return msg.includes('user rejected') || msg.includes('user denied') || msg.includes('rejected the request');
+}
+
 export async function ensureBscNetwork(ethereum: ethers.Eip1193Provider): Promise<void> {
-  const chainIdHex = (await ethereum.request({ method: 'eth_chainId' })) as string;
-  if (parseInt(chainIdHex, 16) === BSC_CHAIN_ID) return;
+  const currentHex = await ethereum.request({ method: 'eth_chainId' });
+  if (parseChainId(currentHex) === BSC_CHAIN_ID) return;
 
   try {
     await ethereum.request({
@@ -272,23 +308,41 @@ export async function ensureBscNetwork(ethereum: ethers.Eip1193Provider): Promis
       params: [{ chainId: BSC_CHAIN_ID_HEX }],
     });
   } catch (err: unknown) {
-    const code = (err as { code?: number })?.code;
-    if (code === 4902) {
-      await ethereum.request({
-        method: 'wallet_addEthereumChain',
-        params: [
-          {
-            chainId: BSC_CHAIN_ID_HEX,
-            chainName: 'BNB Smart Chain',
-            nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
-            rpcUrls: ['https://bsc-dataseed1.binance.org/'],
-            blockExplorerUrls: ['https://bscscan.com/'],
-          },
-        ],
-      });
-    } else {
-      throw err;
+    if (isUserRejectedWalletError(err)) {
+      throw new Error('Please approve switching your wallet to BNB Smart Chain (56).');
     }
+
+    // Many wallets wrap 4902 or throw -32603 / "Unrecognized chain" when BSC isn't added yet
+    await ethereum.request({
+      method: 'wallet_addEthereumChain',
+      params: [
+        {
+          chainId: BSC_CHAIN_ID_HEX,
+          chainName: 'BNB Smart Chain',
+          nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
+          rpcUrls: [
+            'https://bsc-dataseed1.binance.org/',
+            'https://bsc-dataseed2.binance.org/',
+            'https://bsc-rpc.publicnode.com/',
+          ],
+          blockExplorerUrls: ['https://bscscan.com/'],
+        },
+      ],
+    });
+
+    // Some wallets require an explicit switch call after adding the chain
+    const afterAddHex = await ethereum.request({ method: 'eth_chainId' });
+    if (parseChainId(afterAddHex) !== BSC_CHAIN_ID) {
+      await ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: BSC_CHAIN_ID_HEX }],
+      });
+    }
+  }
+
+  const finalHex = await ethereum.request({ method: 'eth_chainId' });
+  if (parseChainId(finalHex) !== BSC_CHAIN_ID) {
+    throw new Error('Wallet is still not on BNB Smart Chain (Chain ID 56). Please switch to BNB Chain in your wallet.');
   }
 }
 

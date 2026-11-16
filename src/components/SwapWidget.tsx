@@ -970,7 +970,7 @@ export function SwapWidget({
                   isGreenMode ? 'text-emerald-100' : 'text-cyan-100'
                 }`}
               />
-              <span>Connect Wallet</span>
+              <span>Connect BNB Wallet</span>
             </button>
           ) : wrongNetwork ? (
             <button
