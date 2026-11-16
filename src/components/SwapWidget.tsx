@@ -43,7 +43,7 @@ interface SwapWidgetProps {
   onConnectWallet: () => void;
   onSwitchToBsc: () => void;
   selectedTokenRequest?: ExternalTokenSelection | null;
-  isRedMode?: boolean;
+  isGreenMode?: boolean;
 }
 
 function formatDisplayAmount(rawStr: string, maxDecimals = 6): string {
@@ -68,7 +68,7 @@ export function SwapWidget({
   onConnectWallet,
   onSwitchToBsc,
   selectedTokenRequest = null,
-  isRedMode = false,
+  isGreenMode = false,
 }: SwapWidgetProps) {
   const [tokens, setTokens] = useState<SwapToken[]>(DEFAULT_SWAP_TOKENS);
   const [balances, setBalances] = useState<Record<string, string>>({});
@@ -462,13 +462,13 @@ export function SwapWidget({
       <div
         aria-hidden="true"
         className={`pointer-events-none absolute -top-1.5 left-1/2 z-20 h-3 w-48 -translate-x-1/2 rounded-full blur-md ${
-          isRedMode ? 'bg-red-400/90' : 'bg-cyan-300/90'
+          isGreenMode ? 'bg-emerald-400/90' : 'bg-cyan-300/90'
         }`}
       />
       <div
         aria-hidden="true"
         className={`pointer-events-none absolute -bottom-1.5 left-1/2 z-20 h-3 w-44 -translate-x-1/2 rounded-full blur-md ${
-          isRedMode ? 'bg-red-500/85' : 'bg-sky-400/85'
+          isGreenMode ? 'bg-emerald-500/85' : 'bg-sky-400/85'
         }`}
       />
 
@@ -478,13 +478,13 @@ export function SwapWidget({
           <div
             aria-hidden="true"
             className={`energy-vein-beam pointer-events-none absolute top-0 right-6 left-6 h-[2.5px] bg-gradient-to-r from-transparent to-transparent ${
-              isRedMode ? 'via-rose-200' : 'via-cyan-200'
+              isGreenMode ? 'via-emerald-200' : 'via-cyan-200'
             }`}
           />
           <div
             aria-hidden="true"
             className={`pointer-events-none absolute right-8 bottom-0 left-8 h-[2px] bg-gradient-to-r from-transparent to-transparent ${
-              isRedMode ? 'via-red-400' : 'via-cyan-300'
+              isGreenMode ? 'via-emerald-400' : 'via-cyan-300'
             }`}
           />
 
@@ -507,23 +507,23 @@ export function SwapWidget({
             </defs>
             <g filter="url(#card-vein-glow)">
               {/* Top bezel veins */}
-              <path d="M22 8 H125 L144 20 H195" stroke={isRedMode ? '#ff223a' : '#00c8ff'} strokeWidth="1.5" />
-              <path d="M478 8 H375 L356 20 H305" stroke={isRedMode ? '#ff223a' : '#00c8ff'} strokeWidth="1.5" />
+              <path d="M22 8 H125 L144 20 H195" stroke={isGreenMode ? '#10b981' : '#00c8ff'} strokeWidth="1.5" />
+              <path d="M478 8 H375 L356 20 H305" stroke={isGreenMode ? '#10b981' : '#00c8ff'} strokeWidth="1.5" />
               {/* Left & right vertical cybernetic vein conduits */}
-              <path d="M8 125 L18 144 V265 L6 286 V365 L18 386 V505 L8 525" stroke={isRedMode ? '#ff1a35' : '#00aaff'} strokeWidth="1.6" />
-              <path d="M492 125 L482 144 V265 L494 286 V365 L482 386 V505 L492 525" stroke={isRedMode ? '#ff1a35' : '#00aaff'} strokeWidth="1.6" />
+              <path d="M8 125 L18 144 V265 L6 286 V365 L18 386 V505 L8 525" stroke={isGreenMode ? '#00e676' : '#00aaff'} strokeWidth="1.6" />
+              <path d="M492 125 L482 144 V265 L494 286 V365 L482 386 V505 L492 525" stroke={isGreenMode ? '#00e676' : '#00aaff'} strokeWidth="1.6" />
               {/* Branching capillary veins into top & bottom corners */}
-              <path d="M18 190 L42 205 L60 205" stroke={isRedMode ? '#ff4d63' : '#38d6ff'} strokeWidth="1.1" strokeOpacity="0.7" />
-              <path d="M482 190 L458 205 L440 205" stroke={isRedMode ? '#ff4d63' : '#38d6ff'} strokeWidth="1.1" strokeOpacity="0.7" />
-              <path d="M18 450 L44 466 L68 466" stroke={isRedMode ? '#ff4d63' : '#38d6ff'} strokeWidth="1.1" strokeOpacity="0.7" />
-              <path d="M482 450 L456 466 L432 466" stroke={isRedMode ? '#ff4d63' : '#38d6ff'} strokeWidth="1.1" strokeOpacity="0.7" />
+              <path d="M18 190 L42 205 L60 205" stroke={isGreenMode ? '#34d399' : '#38d6ff'} strokeWidth="1.1" strokeOpacity="0.7" />
+              <path d="M482 190 L458 205 L440 205" stroke={isGreenMode ? '#34d399' : '#38d6ff'} strokeWidth="1.1" strokeOpacity="0.7" />
+              <path d="M18 450 L44 466 L68 466" stroke={isGreenMode ? '#34d399' : '#38d6ff'} strokeWidth="1.1" strokeOpacity="0.7" />
+              <path d="M482 450 L456 466 L432 466" stroke={isGreenMode ? '#34d399' : '#38d6ff'} strokeWidth="1.1" strokeOpacity="0.7" />
               {/* Bottom bezel veins */}
-              <path d="M22 612 H125 L144 600 H195" stroke={isRedMode ? '#ff223a' : '#00c8ff'} strokeWidth="1.5" />
-              <path d="M478 612 H375 L356 600 H305" stroke={isRedMode ? '#ff223a' : '#00c8ff'} strokeWidth="1.5" />
-              <circle cx="195" cy="20" r="2.3" fill={isRedMode ? '#ffb3be' : '#aef0ff'} />
-              <circle cx="305" cy="20" r="2.3" fill={isRedMode ? '#ffb3be' : '#aef0ff'} />
-              <circle cx="195" cy="600" r="2.3" fill={isRedMode ? '#ffb3be' : '#aef0ff'} />
-              <circle cx="305" cy="600" r="2.3" fill={isRedMode ? '#ffb3be' : '#aef0ff'} />
+              <path d="M22 612 H125 L144 600 H195" stroke={isGreenMode ? '#10b981' : '#00c8ff'} strokeWidth="1.5" />
+              <path d="M478 612 H375 L356 600 H305" stroke={isGreenMode ? '#10b981' : '#00c8ff'} strokeWidth="1.5" />
+              <circle cx="195" cy="20" r="2.3" fill={isGreenMode ? '#a7f3d0' : '#aef0ff'} />
+              <circle cx="305" cy="20" r="2.3" fill={isGreenMode ? '#a7f3d0' : '#aef0ff'} />
+              <circle cx="195" cy="600" r="2.3" fill={isGreenMode ? '#a7f3d0' : '#aef0ff'} />
+              <circle cx="305" cy="600" r="2.3" fill={isGreenMode ? '#a7f3d0' : '#aef0ff'} />
             </g>
           </svg>
 
@@ -536,7 +536,7 @@ export function SwapWidget({
               {tokenOut.isNative ? (
                 <span
                   className={`mt-1 inline-flex items-center gap-1 font-mono text-xs font-medium ${
-                    isRedMode ? 'text-red-400' : 'text-sky-400'
+                    isGreenMode ? 'text-emerald-400' : 'text-sky-400'
                   }`}
                 >
                   BNB · Native Gas Token (Chain 56)
@@ -548,7 +548,7 @@ export function SwapWidget({
                   rel="noopener noreferrer"
                   title={tokenOut.address}
                   className={`mt-1 inline-flex items-center gap-1 font-mono text-xs font-medium hover:underline ${
-                    isRedMode ? 'text-red-400' : 'text-sky-400'
+                    isGreenMode ? 'text-emerald-400' : 'text-sky-400'
                   }`}
                 >
                   <span>
@@ -568,13 +568,13 @@ export function SwapWidget({
                   disabled={loadingBalances}
                   title="Refresh on-chain balances"
                   className={`combat-steel-btn p-2.5 text-slate-200 disabled:opacity-50 ${
-                    isRedMode ? 'hover:text-red-300' : 'hover:text-cyan-300'
+                    isGreenMode ? 'hover:text-emerald-300' : 'hover:text-cyan-300'
                   }`}
                 >
                   <RefreshCw
                     className={`h-4 w-4 ${
                       loadingBalances
-                        ? `animate-spin ${isRedMode ? 'text-red-300' : 'text-cyan-300'}`
+                        ? `animate-spin ${isGreenMode ? 'text-emerald-300' : 'text-cyan-300'}`
                         : ''
                     }`}
                   />
@@ -586,11 +586,11 @@ export function SwapWidget({
                 title="Swap settings"
                 className={`combat-steel-btn p-2.5 ${
                   showSettings
-                    ? isRedMode
-                      ? 'border-red-300 text-red-200 shadow-[0_0_18px_rgba(255,34,58,0.45)]'
+                    ? isGreenMode
+                      ? 'border-emerald-300 text-emerald-200 shadow-[0_0_18px_rgba(16,185,129,0.45)]'
                       : 'border-cyan-300 text-cyan-200 shadow-[0_0_18px_rgba(0,200,255,0.45)]'
-                    : isRedMode
-                    ? 'text-slate-200 hover:text-red-200'
+                    : isGreenMode
+                    ? 'text-slate-200 hover:text-emerald-200'
                     : 'text-slate-200 hover:text-cyan-200'
                 }`}
               >
@@ -617,7 +617,7 @@ export function SwapWidget({
                       </span>
                       <span
                         className={`font-mono font-bold tabular-nums ${
-                          isRedMode ? 'text-red-300' : 'text-cyan-300'
+                          isGreenMode ? 'text-emerald-300' : 'text-cyan-300'
                         }`}
                       >
                         {slippagePct}%
@@ -632,8 +632,8 @@ export function SwapWidget({
                           className={`flex-1 py-1.5 font-mono text-xs font-semibold transition-all ${
                             slippagePct === val
                               ? 'combat-energy-btn text-white'
-                              : isRedMode
-                              ? 'border border-red-500/25 bg-[#1f060c] text-slate-300 hover:border-red-400/55 hover:text-white'
+                              : isGreenMode
+                              ? 'border border-emerald-500/25 bg-[#061f12] text-slate-300 hover:border-emerald-400/55 hover:text-white'
                               : 'border border-sky-500/25 bg-[#071124] text-slate-300 hover:border-sky-400/55 hover:text-white'
                           }`}
                         >
@@ -652,8 +652,8 @@ export function SwapWidget({
                           )
                         }
                         className={`w-20 border bg-[#030712] px-2 py-1.5 text-right font-mono text-xs tabular-nums focus:outline-none ${
-                          isRedMode
-                            ? 'border-red-400/40 text-rose-100 focus:border-red-300'
+                          isGreenMode
+                            ? 'border-emerald-400/40 text-emerald-100 focus:border-emerald-300'
                             : 'border-sky-400/40 text-cyan-100 focus:border-cyan-300'
                         }`}
                       />
@@ -662,7 +662,7 @@ export function SwapWidget({
 
                   <div
                     className={`flex items-center justify-between border-t pt-2.5 ${
-                      isRedMode ? 'border-red-400/20' : 'border-sky-400/20'
+                      isGreenMode ? 'border-emerald-400/20' : 'border-sky-400/20'
                     }`}
                   >
                     <span className="font-semibold tracking-wider text-slate-200 uppercase">
@@ -680,8 +680,8 @@ export function SwapWidget({
                           )
                         }
                         className={`w-14 border bg-[#030712] px-2 py-1 text-right font-mono text-xs tabular-nums focus:outline-none ${
-                          isRedMode
-                            ? 'border-red-400/40 text-rose-100 focus:border-red-300'
+                          isGreenMode
+                            ? 'border-emerald-400/40 text-emerald-100 focus:border-emerald-300'
                             : 'border-sky-400/40 text-cyan-100 focus:border-cyan-300'
                         }`}
                       />
@@ -710,8 +710,8 @@ export function SwapWidget({
                   className={`min-w-0 px-1.5 py-2 sm:flex-1 sm:px-2.5 font-semibold tracking-wide whitespace-nowrap text-center transition-all ${
                     routeMode === opt.id
                       ? 'combat-energy-btn text-white drop-shadow-[0_1px_2px_rgba(2,6,23,0.9)]'
-                      : isRedMode
-                      ? 'border border-transparent text-slate-300 hover:border-red-500/35 hover:text-white'
+                      : isGreenMode
+                      ? 'border border-transparent text-slate-300 hover:border-emerald-500/35 hover:text-white'
                       : 'border border-transparent text-slate-300 hover:border-sky-500/35 hover:text-white'
                   }`}
                 >
@@ -741,7 +741,7 @@ export function SwapWidget({
                         type="button"
                         onClick={() => handleFillFraction(1, 2)}
                         className={`font-mono text-[11px] font-semibold text-slate-300 transition-colors ${
-                          isRedMode ? 'hover:text-red-300' : 'hover:text-cyan-300'
+                          isGreenMode ? 'hover:text-emerald-300' : 'hover:text-cyan-300'
                         }`}
                       >
                         50%
@@ -750,7 +750,7 @@ export function SwapWidget({
                         type="button"
                         onClick={() => handleFillFraction(1, 1)}
                         className={`font-mono text-[11px] font-bold transition-colors hover:text-white ${
-                          isRedMode ? 'text-red-300' : 'text-sky-300'
+                          isGreenMode ? 'text-emerald-300' : 'text-sky-300'
                         }`}
                       >
                         MAX
@@ -784,7 +784,7 @@ export function SwapWidget({
                   <span className="font-sans text-xs sm:text-sm font-bold tracking-wide text-white">
                     {tokenIn.symbol}
                   </span>
-                  <ChevronDown className={`h-4 w-4 ${isRedMode ? 'text-red-300' : 'text-sky-300'}`} />
+                  <ChevronDown className={`h-4 w-4 ${isGreenMode ? 'text-emerald-300' : 'text-sky-300'}`} />
                 </button>
               </div>
             </div>
@@ -795,8 +795,8 @@ export function SwapWidget({
             <div
               aria-hidden="true"
               className={`pointer-events-none absolute right-10 left-10 h-[2px] bg-gradient-to-r from-transparent to-transparent ${
-                isRedMode
-                  ? 'via-red-400 shadow-[0_0_10px_rgba(255,34,58,0.85)]'
+                isGreenMode
+                  ? 'via-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.85)]'
                   : 'via-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.8)]'
               }`}
             />
@@ -807,7 +807,7 @@ export function SwapWidget({
               transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
               aria-label="Flip swap direction"
               className={`combat-hex-core relative flex h-11 w-12 items-center justify-center hover:text-white ${
-                isRedMode ? 'text-red-200' : 'text-cyan-200'
+                isGreenMode ? 'text-emerald-200' : 'text-cyan-200'
               }`}
             >
               <ArrowUpDown className="h-4 w-4" />
@@ -838,7 +838,7 @@ export function SwapWidget({
                   {quoting && amountInWei > 0n ? (
                     <span
                       className={`inline-flex items-center gap-2 text-base font-medium ${
-                        isRedMode ? 'text-red-300' : 'text-cyan-300'
+                        isGreenMode ? 'text-emerald-300' : 'text-cyan-300'
                       }`}
                     >
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -847,8 +847,8 @@ export function SwapWidget({
                   ) : quote ? (
                     <span
                       className={`text-white ${
-                        isRedMode
-                          ? 'drop-shadow-[0_0_10px_rgba(255,34,58,0.35)]'
+                        isGreenMode
+                          ? 'drop-shadow-[0_0_10px_rgba(16,185,129,0.35)]'
                           : 'drop-shadow-[0_0_10px_rgba(56,189,248,0.3)]'
                       }`}
                     >
@@ -868,7 +868,7 @@ export function SwapWidget({
                   <span className="font-sans text-xs sm:text-sm font-bold tracking-wide text-white">
                     {tokenOut.symbol}
                   </span>
-                  <ChevronDown className={`h-4 w-4 ${isRedMode ? 'text-red-300' : 'text-sky-300'}`} />
+                  <ChevronDown className={`h-4 w-4 ${isGreenMode ? 'text-emerald-300' : 'text-sky-300'}`} />
                 </button>
               </div>
             </div>
@@ -878,7 +878,7 @@ export function SwapWidget({
           {quote && amountInWei > 0n && (
             <div
               className={`relative z-10 mt-4 space-y-2 border-t pt-3.5 text-xs ${
-                isRedMode ? 'border-red-400/25' : 'border-sky-400/25'
+                isGreenMode ? 'border-emerald-400/25' : 'border-sky-400/25'
               }`}
             >
               <div className="flex items-center justify-between">
@@ -895,7 +895,7 @@ export function SwapWidget({
                 <span className="text-slate-400">
                   Minimum received ({slippagePct}% slippage)
                 </span>
-                <span className={`font-mono tabular-nums ${isRedMode ? 'text-rose-200' : 'text-cyan-200'}`}>
+                <span className={`font-mono tabular-nums ${isGreenMode ? 'text-emerald-200' : 'text-cyan-200'}`}>
                   {formatDisplayAmount(
                     ethers.formatUnits(minReceivedWei, tokenOut.decimals)
                   )}{' '}
@@ -910,8 +910,8 @@ export function SwapWidget({
                       ? 'text-red-400'
                       : quote.priceImpactPct > 1.5
                       ? 'text-amber-300'
-                      : isRedMode
-                      ? 'text-rose-300'
+                      : isGreenMode
+                      ? 'text-emerald-300'
                       : 'text-cyan-300'
                   }`}
                 >
@@ -939,7 +939,7 @@ export function SwapWidget({
               )}
               <div className="flex items-center justify-between gap-2">
                 <span className="shrink-0 text-slate-400">On-chain route</span>
-                <span className={`truncate text-right font-mono ${isRedMode ? 'text-rose-200' : 'text-cyan-200'}`}>
+                <span className={`truncate text-right font-mono ${isGreenMode ? 'text-emerald-200' : 'text-cyan-200'}`}>
                   {quote.routeSymbols.join(' → ')} · {quote.dexLabel}
                 </span>
               </div>
@@ -967,7 +967,7 @@ export function SwapWidget({
             >
               <Wallet
                 className={`h-4 w-4 drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] ${
-                  isRedMode ? 'text-rose-100' : 'text-cyan-100'
+                  isGreenMode ? 'text-emerald-100' : 'text-cyan-100'
                 }`}
               />
               <span>Connect Wallet</span>
@@ -1002,7 +1002,7 @@ export function SwapWidget({
               disabled
               className="combat-energy-btn font-display relative z-10 mt-5 flex w-full cursor-not-allowed items-center justify-center gap-2 px-4 py-3.5 text-xs font-bold tracking-widest text-slate-300 uppercase"
             >
-              <Loader2 className={`h-4 w-4 animate-spin ${isRedMode ? 'text-red-400' : 'text-cyan-400'}`} />
+              <Loader2 className={`h-4 w-4 animate-spin ${isGreenMode ? 'text-emerald-400' : 'text-cyan-400'}`} />
               <span>{quoting ? 'Fetching On-Chain Quote...' : 'Unavailable'}</span>
             </button>
           ) : needsApproval ? (
@@ -1054,7 +1054,7 @@ export function SwapWidget({
             >
               <div className="armor-well p-3.5 text-xs">
                 {txStatusText && (
-                  <div className={`font-medium ${isRedMode ? 'text-rose-200' : 'text-cyan-200'}`}>
+                  <div className={`font-medium ${isGreenMode ? 'text-emerald-200' : 'text-cyan-200'}`}>
                     {txStatusText}
                   </div>
                 )}
@@ -1064,7 +1064,7 @@ export function SwapWidget({
                     target="_blank"
                     rel="noopener noreferrer"
                     className={`mt-1.5 inline-flex items-center gap-1 font-mono text-[11px] hover:text-white hover:underline ${
-                      isRedMode ? 'text-red-300' : 'text-sky-300'
+                      isGreenMode ? 'text-emerald-300' : 'text-sky-300'
                     }`}
                   >
                     <span>
@@ -1103,12 +1103,12 @@ export function SwapWidget({
                   <div
                     aria-hidden="true"
                     className={`pointer-events-none absolute top-0 right-6 left-6 h-[1.5px] bg-gradient-to-r from-transparent to-transparent ${
-                      isRedMode ? 'via-red-400' : 'via-cyan-400'
+                      isGreenMode ? 'via-emerald-400' : 'via-cyan-400'
                     }`}
                   />
                   <div
                     className={`mb-3.5 flex items-center justify-between border-b pb-3 ${
-                      isRedMode ? 'border-red-400/20' : 'border-sky-400/20'
+                      isGreenMode ? 'border-emerald-400/20' : 'border-sky-400/20'
                     }`}
                   >
                     <h2 className="font-display chrome-text text-sm font-bold tracking-widest uppercase">
@@ -1118,7 +1118,7 @@ export function SwapWidget({
                       type="button"
                       onClick={() => setSelectorSide(null)}
                       className={`combat-steel-btn p-1.5 text-slate-300 ${
-                        isRedMode ? 'hover:text-red-200' : 'hover:text-cyan-200'
+                        isGreenMode ? 'hover:text-emerald-200' : 'hover:text-cyan-200'
                       }`}
                     >
                       <X className="h-4 w-4" />
@@ -1140,7 +1140,7 @@ export function SwapWidget({
                     <div className="armor-well-rim mb-3">
                       <div
                         className={`armor-well flex items-center gap-2 px-3 py-2.5 text-xs ${
-                          isRedMode ? 'text-red-300' : 'text-cyan-300'
+                          isGreenMode ? 'text-emerald-300' : 'text-cyan-300'
                         }`}
                       >
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1158,15 +1158,15 @@ export function SwapWidget({
                   {importedCandidate && (
                     <div
                       className={`mb-3 flex items-center justify-between border px-3.5 py-2.5 ${
-                        isRedMode
-                          ? 'border-red-400/55 bg-red-500/12 shadow-[0_0_16px_rgba(255,34,58,0.2)]'
+                        isGreenMode
+                          ? 'border-emerald-400/55 bg-emerald-500/12 shadow-[0_0_16px_rgba(16,185,129,0.2)]'
                           : 'border-cyan-400/55 bg-sky-500/12 shadow-[0_0_16px_rgba(0,180,255,0.2)]'
                       }`}
                     >
                       <div className="flex items-center gap-3">
                         <TokenLogo token={importedCandidate} size={30} />
                         <div>
-                          <div className={`font-mono text-sm font-bold ${isRedMode ? 'text-rose-100' : 'text-cyan-100'}`}>
+                          <div className={`font-mono text-sm font-bold ${isGreenMode ? 'text-emerald-100' : 'text-cyan-100'}`}>
                             {importedCandidate.symbol}
                           </div>
                           <div className="text-xs text-slate-300">
@@ -1187,7 +1187,7 @@ export function SwapWidget({
 
                   <div
                     className={`max-h-72 divide-y overflow-y-auto pr-1 ${
-                      isRedMode ? 'divide-red-500/15' : 'divide-sky-500/15'
+                      isGreenMode ? 'divide-emerald-500/15' : 'divide-sky-500/15'
                     }`}
                   >
                     {filteredTokens.map((t) => {
@@ -1201,8 +1201,8 @@ export function SwapWidget({
                           onClick={() => handleSelectToken(t)}
                           className={`flex w-full items-center justify-between px-3 py-3 text-left transition-colors ${
                             isSelected
-                              ? isRedMode
-                                ? 'bg-red-500/16 shadow-[inset_0_0_14px_rgba(255,34,58,0.16)]'
+                              ? isGreenMode
+                                ? 'bg-emerald-500/16 shadow-[inset_0_0_14px_rgba(16,185,129,0.16)]'
                                 : 'bg-sky-500/16 shadow-[inset_0_0_14px_rgba(0,180,255,0.16)]'
                               : 'hover:bg-slate-800/55'
                           }`}
@@ -1222,7 +1222,7 @@ export function SwapWidget({
                           </div>
                           <div
                             className={`text-right font-mono text-xs font-medium tabular-nums ${
-                              isRedMode ? 'text-rose-200' : 'text-cyan-200'
+                              isGreenMode ? 'text-emerald-200' : 'text-cyan-200'
                             }`}
                           >
                             {walletAddress

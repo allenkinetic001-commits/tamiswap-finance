@@ -91,7 +91,7 @@ export default function App() {
   const [walletNotice, setWalletNotice] = useState<string | null>(null);
   const [modalNotice, setModalNotice] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState(false);
-  const [isRedMode, setIsRedMode] = useState<boolean>(false);
+  const [isGreenMode, setIsGreenMode] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'swap' | 'top-tokens'>('swap');
   const [selectedTokenRequest, setSelectedTokenRequest] =
     useState<ExternalTokenSelection | null>(null);
@@ -99,6 +99,7 @@ export default function App() {
   useEffect(() => {
     try {
       window.localStorage.removeItem('tamiswap_red_mode');
+      window.localStorage.removeItem('tamiswap_green_mode');
     } catch {
       // ignore storage errors
     }
@@ -401,23 +402,23 @@ export default function App() {
       ]
     : [];
 
-  const svgColors = isRedMode
+  const svgColors = isGreenMode
     ? {
-        wingTop: '#380f18',
-        wingMid: '#24090f',
-        wingBot: '#5f1e2c',
-        plasma0: '#cc0022',
-        plasma1: '#ff223a',
-        plasma2: '#ffd6dc',
-        cornerFill: '#2c0710',
-        border: '#ff223a',
-        veinMain: '#ff1e38',
-        veinCore: '#ffb3be',
-        veinBranch: '#ff3b52',
-        veinMid: '#ff2a42',
-        veinBright: '#ff4d63',
-        nodeLight: '#ff99a8',
-        nodeBright: '#ff3b52',
+        wingTop: '#0f3821',
+        wingMid: '#092415',
+        wingBot: '#1e5f3a',
+        plasma0: '#059669',
+        plasma1: '#10b981',
+        plasma2: '#d1fae5',
+        cornerFill: '#072c18',
+        border: '#10b981',
+        veinMain: '#00e676',
+        veinCore: '#a7f3d0',
+        veinBranch: '#34d399',
+        veinMid: '#10b981',
+        veinBright: '#38ff9c',
+        nodeLight: '#6ee7b7',
+        nodeBright: '#34d399',
       }
     : {
         wingTop: '#0f1e38',
@@ -440,7 +441,7 @@ export default function App() {
   return (
     <div
       className={`combat-tech-backdrop relative flex min-h-screen flex-col overflow-x-hidden text-slate-100 ${
-        isRedMode ? 'theme-red' : ''
+        isGreenMode ? 'theme-green' : ''
       }`}
     >
       {/* Symmetrical Cybernetic Armor Cockpit & Glowing Neon Vein Network */}
@@ -645,12 +646,12 @@ export default function App() {
 
         <div
           className={`energy-vein-glow absolute top-1/4 left-1/2 h-[500px] w-[720px] -translate-x-1/2 rounded-full blur-[140px] ${
-            isRedMode ? 'bg-red-500/24' : 'bg-sky-500/24'
+            isGreenMode ? 'bg-emerald-500/24' : 'bg-sky-500/24'
           }`}
         />
         <div
           className={`absolute bottom-0 left-1/2 h-[340px] w-[580px] -translate-x-1/2 rounded-full blur-[130px] ${
-            isRedMode ? 'bg-rose-600/24' : 'bg-blue-600/24'
+            isGreenMode ? 'bg-green-600/24' : 'bg-blue-600/24'
           }`}
         />
       </div>
@@ -660,8 +661,8 @@ export default function App() {
         <div
           aria-hidden="true"
           className={`energy-vein-beam pointer-events-none absolute right-0 bottom-0 left-0 h-[2px] bg-gradient-to-r ${
-            isRedMode
-              ? 'from-red-500/40 via-rose-300 to-red-500/40'
+            isGreenMode
+              ? 'from-emerald-500/40 via-emerald-300 to-emerald-500/40'
               : 'from-sky-500/40 via-cyan-300 to-sky-500/40'
           }`}
         />
@@ -670,7 +671,7 @@ export default function App() {
             <div
               aria-hidden="true"
               className={`pointer-events-none absolute inset-1 rounded-full blur-md ${
-                isRedMode ? 'bg-red-500/35' : 'bg-sky-400/25'
+                isGreenMode ? 'bg-emerald-500/35' : 'bg-sky-400/25'
               }`}
             />
             <img
@@ -679,16 +680,16 @@ export default function App() {
               width={68}
               height={64}
               className={`relative z-10 h-13 w-auto sm:h-16 object-contain [image-rendering:-webkit-optimize-contrast] transition-opacity duration-150 ${
-                isRedMode ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                isGreenMode ? 'opacity-0 pointer-events-none' : 'opacity-100'
               }`}
             />
             <img
-              src="/assets/aistudio/tamiswap_red.png?v=2"
-              alt="TamiSwap logo red mode"
+              src="/assets/aistudio/tamiswap_green.png"
+              alt="TamiSwap logo green mode"
               width={68}
               height={64}
-              className={`absolute inset-0 m-auto z-10 h-13 w-auto sm:h-16 object-contain drop-shadow-[0_0_10px_rgba(255,30,56,0.55)] [image-rendering:-webkit-optimize-contrast] transition-opacity duration-150 ${
-                isRedMode ? 'opacity-100' : 'opacity-0 pointer-events-none'
+              className={`absolute inset-0 m-auto z-10 h-13 w-auto sm:h-16 object-contain drop-shadow-[0_0_10px_rgba(16,185,129,0.55)] [image-rendering:-webkit-optimize-contrast] transition-opacity duration-150 ${
+                isGreenMode ? 'opacity-100' : 'opacity-0 pointer-events-none'
               }`}
             />
           </div>
@@ -699,16 +700,16 @@ export default function App() {
               width={180}
               height={60}
               className={`relative z-10 h-9 w-auto max-w-full sm:h-14 sm:max-w-none object-contain object-left drop-shadow-[0_0_12px_rgba(0,180,255,0.45)] [image-rendering:-webkit-optimize-contrast] transition-opacity duration-150 ${
-                isRedMode ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                isGreenMode ? 'opacity-0 pointer-events-none' : 'opacity-100'
               }`}
             />
             <img
-              src="/assets/aistudio/tamiswap1_red.png?v=2"
-              alt="TamiSwap red mode"
+              src="/assets/aistudio/tamiswap1_green.png"
+              alt="TamiSwap green mode"
               width={180}
               height={60}
-              className={`absolute inset-0 z-10 h-full w-full object-contain object-left drop-shadow-[0_0_12px_rgba(255,34,58,0.5)] [image-rendering:-webkit-optimize-contrast] transition-opacity duration-150 ${
-                isRedMode ? 'opacity-100' : 'opacity-0 pointer-events-none'
+              className={`absolute inset-0 z-10 h-full w-full object-contain object-left drop-shadow-[0_0_12px_rgba(16,185,129,0.5)] [image-rendering:-webkit-optimize-contrast] transition-opacity duration-150 ${
+                isGreenMode ? 'opacity-100' : 'opacity-0 pointer-events-none'
               }`}
             />
           </div>
@@ -719,33 +720,33 @@ export default function App() {
             role="group"
             aria-label="Theme color switch"
             className={`inline-flex shrink-0 items-center gap-1 rounded-full border p-0.5 transition-colors duration-200 ${
-              isRedMode
-                ? 'border-red-400/80 bg-[#22040a]/90 shadow-[0_0_14px_rgba(255,34,58,0.5)]'
+              isGreenMode
+                ? 'border-emerald-400/80 bg-[#042212]/90 shadow-[0_0_14px_rgba(16,185,129,0.5)]'
                 : 'border-sky-400/80 bg-[#041024]/90 shadow-[0_0_14px_rgba(0,180,255,0.45)]'
             }`}
           >
             <button
               type="button"
-              onClick={() => setIsRedMode(false)}
-              aria-pressed={!isRedMode}
+              onClick={() => setIsGreenMode(false)}
+              aria-pressed={!isGreenMode}
               aria-label="Switch to Blue theme"
               title="Blue Mode"
               className={`flex h-4.5 w-4.5 sm:h-6 sm:w-6 cursor-pointer items-center justify-center rounded-full transition-all duration-150 ${
-                !isRedMode
+                !isGreenMode
                   ? 'bg-gradient-to-br from-cyan-100 via-sky-400 to-blue-600 shadow-[0_0_10px_rgba(0,212,255,0.95)] ring-1 ring-cyan-200'
                   : 'bg-sky-500/25 opacity-55 hover:opacity-90'
               }`}
             />
             <button
               type="button"
-              onClick={() => setIsRedMode(true)}
-              aria-pressed={isRedMode}
-              aria-label="Switch to Red theme"
-              title="Red Mode"
+              onClick={() => setIsGreenMode(true)}
+              aria-pressed={isGreenMode}
+              aria-label="Switch to Green theme"
+              title="Green Mode"
               className={`flex h-4.5 w-4.5 sm:h-6 sm:w-6 cursor-pointer items-center justify-center rounded-full transition-all duration-150 ${
-                isRedMode
-                  ? 'bg-gradient-to-br from-rose-200 via-red-500 to-red-700 shadow-[0_0_10px_rgba(255,40,64,0.95)] ring-1 ring-rose-200'
-                  : 'bg-red-500/25 opacity-55 hover:opacity-90'
+                isGreenMode
+                  ? 'bg-gradient-to-br from-emerald-200 via-emerald-500 to-green-700 shadow-[0_0_10px_rgba(16,185,129,0.95)] ring-1 ring-emerald-200'
+                  : 'bg-emerald-500/25 opacity-55 hover:opacity-90'
               }`}
             />
           </div>
@@ -764,8 +765,8 @@ export default function App() {
             >
               <Wallet
                 className={`h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 shrink-0 ${
-                  isRedMode
-                    ? 'text-red-300 drop-shadow-[0_0_6px_rgba(255,40,64,0.9)]'
+                  isGreenMode
+                    ? 'text-emerald-300 drop-shadow-[0_0_6px_rgba(16,185,129,0.9)]'
                     : 'text-cyan-300 drop-shadow-[0_0_6px_rgba(0,212,255,0.9)]'
                 }`}
               />
@@ -798,8 +799,8 @@ export default function App() {
                 className={`inline-flex items-center justify-center gap-2 px-3 py-2 font-display text-[11px] font-bold tracking-wider uppercase transition-all whitespace-nowrap ${
                   activeTab === 'swap'
                     ? 'combat-energy-btn text-white drop-shadow-[0_1px_2px_rgba(2,6,23,0.9)]'
-                    : isRedMode
-                    ? 'border border-transparent text-slate-300 hover:border-red-500/35 hover:text-white'
+                    : isGreenMode
+                    ? 'border border-transparent text-slate-300 hover:border-emerald-500/35 hover:text-white'
                     : 'border border-transparent text-slate-300 hover:border-sky-500/35 hover:text-white'
                 }`}
               >
@@ -814,8 +815,8 @@ export default function App() {
                 className={`inline-flex items-center justify-center gap-2 px-3 py-2 font-display text-[11px] font-bold tracking-wider uppercase transition-all whitespace-nowrap ${
                   activeTab === 'top-tokens'
                     ? 'combat-energy-btn text-white drop-shadow-[0_1px_2px_rgba(2,6,23,0.9)]'
-                    : isRedMode
-                    ? 'border border-transparent text-slate-300 hover:border-red-500/35 hover:text-white'
+                    : isGreenMode
+                    ? 'border border-transparent text-slate-300 hover:border-emerald-500/35 hover:text-white'
                     : 'border border-transparent text-slate-300 hover:border-sky-500/35 hover:text-white'
                 }`}
               >
@@ -835,7 +836,7 @@ export default function App() {
             <div className="armor-well-rim">
               <div
                 className={`armor-well px-4 py-2.5 text-center text-xs ${
-                  isRedMode ? 'text-rose-100' : 'text-cyan-100'
+                  isGreenMode ? 'text-emerald-100' : 'text-cyan-100'
                 }`}
               >
                 {walletNotice}
@@ -852,14 +853,14 @@ export default function App() {
             onConnectWallet={handleConnectButton}
             onSwitchToBsc={handleSwitchToBsc}
             selectedTokenRequest={selectedTokenRequest}
-            isRedMode={isRedMode}
+            isGreenMode={isGreenMode}
           />
         </div>
 
         {activeTab === 'top-tokens' && (
           <TopTokensView
             onSelectTokenForSwap={handleSelectTokenForSwap}
-            isRedMode={isRedMode}
+            isGreenMode={isGreenMode}
           />
         )}
       </main>
@@ -888,12 +889,12 @@ export default function App() {
                   <div
                     aria-hidden="true"
                     className={`pointer-events-none absolute top-0 right-6 left-6 h-[1.5px] bg-gradient-to-r from-transparent to-transparent ${
-                      isRedMode ? 'via-red-400' : 'via-cyan-400'
+                      isGreenMode ? 'via-emerald-400' : 'via-cyan-400'
                     }`}
                   />
                   <div
                     className={`mb-4 flex items-center justify-between border-b pb-3 ${
-                      isRedMode ? 'border-red-400/20' : 'border-sky-400/20'
+                      isGreenMode ? 'border-emerald-400/20' : 'border-sky-400/20'
                     }`}
                   >
                     <h2 className="font-display chrome-text text-sm font-bold tracking-widest uppercase">
@@ -903,7 +904,7 @@ export default function App() {
                       type="button"
                       onClick={() => setShowWalletModal(false)}
                       className={`combat-steel-btn p-1.5 text-slate-300 ${
-                        isRedMode ? 'hover:text-red-200' : 'hover:text-cyan-200'
+                        isGreenMode ? 'hover:text-emerald-200' : 'hover:text-cyan-200'
                       }`}
                     >
                       <X className="h-4 w-4" />
@@ -916,7 +917,7 @@ export default function App() {
                         <div className="armor-well p-3.5">
                           <div
                             className={`text-xs font-semibold tracking-wider uppercase ${
-                              isRedMode ? 'text-red-300' : 'text-sky-300'
+                              isGreenMode ? 'text-emerald-300' : 'text-sky-300'
                             }`}
                           >
                             Active Address (BNB Chain)
@@ -964,7 +965,7 @@ export default function App() {
                                   ) : (
                                     <Wallet
                                       className={`h-4 w-4 ${
-                                        isRedMode ? 'text-red-300' : 'text-cyan-300'
+                                        isGreenMode ? 'text-emerald-300' : 'text-cyan-300'
                                       }`}
                                     />
                                   )}
@@ -972,7 +973,7 @@ export default function App() {
                                 </span>
                                 <span
                                   className={`font-mono text-[11px] ${
-                                    isRedMode ? 'text-red-300' : 'text-cyan-300'
+                                    isGreenMode ? 'text-emerald-300' : 'text-cyan-300'
                                   }`}
                                 >
                                   Connect
@@ -1020,7 +1021,7 @@ export default function App() {
                               </span>
                               <ExternalLink
                                 className={`h-3 w-3 shrink-0 opacity-80 ${
-                                  isRedMode ? 'text-red-300' : 'text-cyan-300'
+                                  isGreenMode ? 'text-emerald-300' : 'text-cyan-300'
                                 }`}
                               />
                             </a>
@@ -1029,8 +1030,8 @@ export default function App() {
                         {modalNotice && (
                           <div
                             className={`border px-3 py-2 text-[11px] leading-relaxed ${
-                              isRedMode
-                                ? 'border-red-400/45 bg-red-950/40 text-rose-100'
+                              isGreenMode
+                                ? 'border-emerald-400/45 bg-emerald-950/40 text-emerald-100'
                                 : 'border-sky-400/45 bg-sky-950/40 text-cyan-100'
                             }`}
                           >

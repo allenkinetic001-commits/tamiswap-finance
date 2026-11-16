@@ -10,7 +10,7 @@ import { TokenLogo } from './TokenLogo';
 
 interface TopTokensViewProps {
   onSelectTokenForSwap: (token: TopTokenEntry) => void;
-  isRedMode?: boolean;
+  isGreenMode?: boolean;
 }
 
 function formatUsdPrice(price: number): string {
@@ -71,7 +71,7 @@ function TrendTriangle({ isUp }: { isUp: boolean }) {
 
 export function TopTokensView({
   onSelectTokenForSwap,
-  isRedMode = false,
+  isGreenMode = false,
 }: TopTokensViewProps) {
   const [tokens, setTokens] = useState<TopTokenEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -141,13 +141,13 @@ export function TopTokensView({
       <div
         aria-hidden="true"
         className={`pointer-events-none absolute -top-1.5 left-1/2 z-20 h-3 w-56 -translate-x-1/2 rounded-full blur-md ${
-          isRedMode ? 'bg-red-400/90' : 'bg-cyan-300/90'
+          isGreenMode ? 'bg-emerald-400/90' : 'bg-cyan-300/90'
         }`}
       />
       <div
         aria-hidden="true"
         className={`pointer-events-none absolute -bottom-1.5 left-1/2 z-20 h-3 w-52 -translate-x-1/2 rounded-full blur-md ${
-          isRedMode ? 'bg-red-500/85' : 'bg-sky-400/85'
+          isGreenMode ? 'bg-emerald-500/85' : 'bg-sky-400/85'
         }`}
       />
 
@@ -156,13 +156,13 @@ export function TopTokensView({
           <div
             aria-hidden="true"
             className={`energy-vein-beam pointer-events-none absolute top-0 right-6 left-6 h-[2.5px] bg-gradient-to-r from-transparent to-transparent ${
-              isRedMode ? 'via-rose-200' : 'via-cyan-200'
+              isGreenMode ? 'via-emerald-200' : 'via-cyan-200'
             }`}
           />
           <div
             aria-hidden="true"
             className={`pointer-events-none absolute right-8 bottom-0 left-8 h-[2px] bg-gradient-to-r from-transparent to-transparent ${
-              isRedMode ? 'via-red-400' : 'via-cyan-300'
+              isGreenMode ? 'via-emerald-400' : 'via-cyan-300'
             }`}
           />
 
@@ -189,13 +189,13 @@ export function TopTokensView({
                 disabled={loading || refreshing}
                 title="Refresh live token rankings"
                 className={`combat-steel-btn inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-200 disabled:opacity-50 ${
-                  isRedMode ? 'hover:text-red-200' : 'hover:text-cyan-200'
+                  isGreenMode ? 'hover:text-emerald-200' : 'hover:text-cyan-200'
                 }`}
               >
                 <RefreshCw
                   className={`h-3.5 w-3.5 ${
                     refreshing
-                      ? `animate-spin ${isRedMode ? 'text-red-300' : 'text-cyan-300'}`
+                      ? `animate-spin ${isGreenMode ? 'text-emerald-300' : 'text-cyan-300'}`
                       : ''
                   }`}
                 />
@@ -210,7 +210,7 @@ export function TopTokensView({
               {loading && tokens.length === 0 ? (
                 <div
                   className={`divide-y ${
-                    isRedMode ? 'divide-red-500/15' : 'divide-sky-500/15'
+                    isGreenMode ? 'divide-emerald-500/15' : 'divide-sky-500/15'
                   }`}
                 >
                   {Array.from({ length: 10 }).map((_, idx) => (
@@ -255,7 +255,7 @@ export function TopTokensView({
                       <thead>
                         <tr
                           className={`border-b text-[11px] font-semibold tracking-wider text-slate-400 uppercase ${
-                            isRedMode ? 'border-red-400/20' : 'border-sky-400/20'
+                            isGreenMode ? 'border-emerald-400/20' : 'border-sky-400/20'
                           }`}
                         >
                           <th className="w-12 py-3 pl-4 pr-2 font-mono">#</th>
@@ -268,7 +268,7 @@ export function TopTokensView({
                       </thead>
                       <tbody
                         className={`divide-y ${
-                          isRedMode ? 'divide-red-500/15' : 'divide-sky-500/15'
+                          isGreenMode ? 'divide-emerald-500/15' : 'divide-sky-500/15'
                         }`}
                       >
                         {tokens.map((token) => {
@@ -286,8 +286,8 @@ export function TopTokensView({
                                 }
                               }}
                               className={`group cursor-pointer transition-colors focus:outline-none ${
-                                isRedMode
-                                  ? 'hover:bg-red-500/12 focus:bg-red-500/15'
+                                isGreenMode
+                                  ? 'hover:bg-emerald-500/12 focus:bg-emerald-500/15'
                                   : 'hover:bg-sky-500/12 focus:bg-sky-500/15'
                               }`}
                             >
@@ -331,7 +331,7 @@ export function TopTokensView({
                               <td className="py-3 pl-2 pr-4 text-right">
                                 <span
                                   className={`inline-flex items-center gap-1 font-display text-[11px] font-bold tracking-wider uppercase transition-transform group-hover:translate-x-0.5 ${
-                                    isRedMode ? 'text-red-300' : 'text-cyan-300'
+                                    isGreenMode ? 'text-emerald-300' : 'text-cyan-300'
                                   }`}
                                 >
                                   <span>Swap</span>
@@ -348,7 +348,7 @@ export function TopTokensView({
                   {/* Mobile Compact List (<640px) */}
                   <div
                     className={`divide-y sm:hidden ${
-                      isRedMode ? 'divide-red-500/15' : 'divide-sky-500/15'
+                      isGreenMode ? 'divide-emerald-500/15' : 'divide-sky-500/15'
                     }`}
                   >
                     {tokens.map((token) => {
@@ -359,8 +359,8 @@ export function TopTokensView({
                           type="button"
                           onClick={() => onSelectTokenForSwap(token)}
                           className={`flex w-full items-center justify-between gap-2.5 px-3.5 py-3 text-left transition-colors ${
-                            isRedMode
-                              ? 'active:bg-red-500/15'
+                            isGreenMode
+                              ? 'active:bg-emerald-500/15'
                               : 'active:bg-sky-500/15'
                           }`}
                         >

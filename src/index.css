@@ -487,180 +487,180 @@
   background: rgba(0, 220, 255, 0.78);
 }
 
-/* Red Overdrive Theme Overrides */
-.theme-red.combat-tech-backdrop {
-  background-color: #0b0104;
+/* Green Overdrive Theme Overrides */
+.theme-green.combat-tech-backdrop {
+  background-color: #010b05;
   background-image:
-    radial-gradient(ellipse 70% 55% at 50% 42%, rgba(255, 24, 56, 0.28) 0%, rgba(165, 0, 32, 0.44) 42%, rgba(11, 1, 4, 0.99) 100%),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cg fill-rule='evenodd'%3E%3Cg fill='%23ff1e38' fill-opacity='0.07'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-8l12.99-7.5H28v2.31h-.01L17 42.15V49h-2z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    radial-gradient(ellipse 70% 55% at 50% 42%, rgba(16, 185, 129, 0.28) 0%, rgba(4, 120, 87, 0.42) 42%, rgba(1, 11, 5, 0.99) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cg fill-rule='evenodd'%3E%3Cg fill='%2310b981' fill-opacity='0.075'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-8l12.99-7.5H28v2.31h-.01L17 42.15V49h-2z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
 }
 
-.theme-red .combat-topbar {
+.theme-green .combat-topbar {
   background: linear-gradient(
     180deg,
-    rgba(46, 8, 16, 0.95) 0%,
-    rgba(22, 3, 8, 0.97) 100%
+    rgba(6, 42, 24, 0.95) 0%,
+    rgba(2, 20, 11, 0.97) 100%
   );
-  border-bottom: 1.5px solid #ff223a;
+  border-bottom: 1.5px solid #10b981;
   box-shadow:
-    0 6px 34px rgba(255, 24, 56, 0.45),
-    0 0 14px rgba(255, 56, 78, 0.35),
-    inset 0 1px 0 rgba(255, 180, 190, 0.35);
+    0 6px 34px rgba(16, 185, 129, 0.42),
+    0 0 14px rgba(52, 211, 153, 0.32),
+    inset 0 1px 0 rgba(167, 243, 208, 0.35);
 }
 
-.theme-red .chrome-text {
-  background: linear-gradient(180deg, #ffffff 0%, #ffe4e6 45%, #fda4af 76%, #ffffff 100%);
+.theme-green .chrome-text {
+  background: linear-gradient(180deg, #ffffff 0%, #d1fae5 45%, #6ee7b7 76%, #ffffff 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 0 10px rgba(255, 30, 56, 0.68));
+  filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.68));
 }
 
-.theme-red .armor-chassis-shell {
+.theme-green .armor-chassis-shell {
   filter:
     drop-shadow(0 24px 55px rgba(0, 0, 0, 0.95))
-    drop-shadow(0 0 28px rgba(255, 30, 56, 0.58))
-    drop-shadow(0 0 8px rgba(255, 68, 88, 0.42));
+    drop-shadow(0 0 28px rgba(16, 185, 129, 0.55))
+    drop-shadow(0 0 8px rgba(52, 211, 153, 0.4));
 }
 
-.theme-red .armor-chassis-rim {
+.theme-green .armor-chassis-rim {
   background: linear-gradient(
     180deg,
-    #fecdd3 0%,
-    #ff223a 16%,
-    #b91c1c 50%,
-    #ff223a 84%,
-    #fecdd3 100%
+    #a7f3d0 0%,
+    #10b981 16%,
+    #047857 50%,
+    #10b981 84%,
+    #a7f3d0 100%
   );
 }
 
-.theme-red .armor-chassis {
-  background-color: rgba(24, 3, 9, 0.94);
+.theme-green .armor-chassis {
+  background-color: rgba(3, 22, 13, 0.94);
   background-image:
-    radial-gradient(ellipse 95% 48% at 50% 0%, rgba(255, 30, 56, 0.24) 0%, transparent 62%),
-    radial-gradient(ellipse 85% 40% at 50% 100%, rgba(220, 20, 48, 0.22) 0%, transparent 65%),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='35' viewBox='0 0 28 49'%3E%3Cg fill='%23ff1e38' fill-opacity='0.055'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5z'/%3E%3C/g%3E%3C/svg%3E");
+    radial-gradient(ellipse 95% 48% at 50% 0%, rgba(16, 185, 129, 0.24) 0%, transparent 62%),
+    radial-gradient(ellipse 85% 40% at 50% 100%, rgba(5, 150, 105, 0.22) 0%, transparent 65%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='35' viewBox='0 0 28 49'%3E%3Cg fill='%2310b981' fill-opacity='0.06'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5z'/%3E%3C/g%3E%3C/svg%3E");
   box-shadow:
-    inset 0 0 42px rgba(255, 24, 56, 0.22),
-    inset 0 1px 0 rgba(255, 180, 190, 0.45);
+    inset 0 0 42px rgba(16, 185, 129, 0.22),
+    inset 0 1px 0 rgba(167, 243, 208, 0.45);
 }
 
-.theme-red .armor-well-rim {
+.theme-green .armor-well-rim {
   background: linear-gradient(
     135deg,
-    rgba(255, 165, 178, 0.92) 0%,
-    rgba(255, 34, 58, 0.55) 36%,
-    rgba(185, 12, 34, 0.65) 65%,
-    rgba(255, 64, 82, 0.95) 100%
+    rgba(167, 243, 208, 0.92) 0%,
+    rgba(16, 185, 129, 0.55) 36%,
+    rgba(4, 120, 87, 0.65) 65%,
+    rgba(52, 211, 153, 0.95) 100%
   );
-  filter: drop-shadow(0 0 8px rgba(255, 34, 58, 0.28));
+  filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.28));
 }
 
-.theme-red .armor-well-rim:focus-within {
+.theme-green .armor-well-rim:focus-within {
   background: linear-gradient(
     135deg,
-    #fff1f2 0%,
-    #ff3b52 45%,
-    #cc0022 75%,
-    #fda4af 100%
+    #ecfdf5 0%,
+    #34d399 45%,
+    #047857 75%,
+    #6ee7b7 100%
   );
-  filter: drop-shadow(0 0 16px rgba(255, 46, 68, 0.65));
+  filter: drop-shadow(0 0 16px rgba(16, 185, 129, 0.65));
 }
 
-.theme-red .armor-well {
+.theme-green .armor-well {
   background: linear-gradient(
     180deg,
-    rgba(18, 2, 7, 0.94) 0%,
-    rgba(36, 5, 13, 0.9) 100%
+    rgba(2, 16, 9, 0.94) 0%,
+    rgba(5, 34, 19, 0.9) 100%
   );
   box-shadow:
     inset 0 4px 16px rgba(0, 0, 0, 0.9),
-    inset 0 0 18px rgba(255, 24, 56, 0.12);
+    inset 0 0 18px rgba(16, 185, 129, 0.12);
 }
 
-.theme-red .combat-steel-btn {
+.theme-green .combat-steel-btn {
   background: linear-gradient(
     180deg,
-    rgba(76, 14, 28, 0.92) 0%,
-    rgba(42, 6, 15, 0.96) 52%,
-    rgba(22, 3, 8, 0.98) 100%
+    rgba(10, 62, 36, 0.92) 0%,
+    rgba(5, 36, 20, 0.96) 52%,
+    rgba(2, 18, 10, 0.98) 100%
   );
-  border: 1.5px solid #ff223a;
+  border: 1.5px solid #10b981;
   box-shadow:
-    inset 0 1px 0 rgba(255, 210, 218, 0.45),
+    inset 0 1px 0 rgba(167, 243, 208, 0.45),
     inset 0 -1px 2px rgba(0, 0, 0, 0.8),
-    0 0 16px rgba(255, 34, 58, 0.42);
+    0 0 16px rgba(16, 185, 129, 0.42);
 }
 
-.theme-red .combat-steel-btn:hover:not(:disabled) {
-  border-color: #fecdd3;
+.theme-green .combat-steel-btn:hover:not(:disabled) {
+  border-color: #a7f3d0;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.6),
-    0 0 24px rgba(255, 48, 72, 0.72);
+    0 0 24px rgba(52, 211, 153, 0.72);
 }
 
-.theme-red .combat-hex-core {
-  background: linear-gradient(180deg, #c40022 0%, #3b0410 100%);
-  border: 1.5px solid #ff4d63;
+.theme-green .combat-hex-core {
+  background: linear-gradient(180deg, #059669 0%, #03331e 100%);
+  border: 1.5px solid #34d399;
   box-shadow:
-    inset 0 1px 3px rgba(255, 210, 218, 0.65),
-    0 0 22px rgba(255, 34, 58, 0.82);
+    inset 0 1px 3px rgba(167, 243, 208, 0.65),
+    0 0 22px rgba(16, 185, 129, 0.82);
 }
 
-.theme-red .combat-hex-core:hover {
+.theme-green .combat-hex-core:hover {
   box-shadow:
     inset 0 1px 3px rgba(255, 255, 255, 0.85),
-    0 0 28px rgba(255, 64, 84, 0.95);
+    0 0 28px rgba(52, 211, 153, 0.95);
 }
 
-.theme-red .combat-energy-btn {
+.theme-green .combat-energy-btn {
   background: linear-gradient(
     180deg,
-    #ff4d63 0%,
-    #e60026 46%,
-    #990018 100%
+    #34d399 0%,
+    #059669 46%,
+    #065f46 100%
   );
-  border: 1.5px solid #ffe4e6;
+  border: 1.5px solid #d1fae5;
   box-shadow:
     inset 0 1px 1px rgba(255, 255, 255, 0.8),
-    inset 0 -2px 5px rgba(24, 2, 7, 0.55),
-    0 0 26px rgba(255, 34, 58, 0.82);
+    inset 0 -2px 5px rgba(2, 20, 11, 0.55),
+    0 0 26px rgba(16, 185, 129, 0.82);
 }
 
-.theme-red .combat-energy-btn:hover:not(:disabled) {
+.theme-green .combat-energy-btn:hover:not(:disabled) {
   box-shadow:
     inset 0 1px 1px rgba(255, 255, 255, 0.9),
-    inset 0 -2px 5px rgba(24, 2, 7, 0.5),
-    0 0 36px rgba(255, 56, 78, 0.95);
+    inset 0 -2px 5px rgba(2, 20, 11, 0.5),
+    0 0 36px rgba(52, 211, 153, 0.95);
 }
 
-.theme-red .combat-energy-btn:disabled {
-  background: linear-gradient(180deg, #2d0b14 0%, #1a050a 100%);
-  border-color: rgba(255, 34, 58, 0.28);
+.theme-green .combat-energy-btn:disabled {
+  background: linear-gradient(180deg, #092618 0%, #04150d 100%);
+  border-color: rgba(16, 185, 129, 0.28);
   box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.08);
 }
 
-.theme-red .wallet-cyber-rim {
+.theme-green .wallet-cyber-rim {
   background: linear-gradient(
     120deg,
-    #ffe4e6 0%,
-    #ff223a 28%,
-    #990018 52%,
-    #ff4d63 78%,
-    #fff1f2 100%
+    #d1fae5 0%,
+    #10b981 28%,
+    #047857 52%,
+    #34d399 78%,
+    #ecfdf5 100%
   );
   filter:
-    drop-shadow(0 0 12px rgba(255, 34, 58, 0.65))
+    drop-shadow(0 0 12px rgba(16, 185, 129, 0.65))
     drop-shadow(0 4px 10px rgba(0, 0, 0, 0.85));
 }
 
-.theme-red .wallet-cyber-rim:hover {
+.theme-green .wallet-cyber-rim:hover {
   filter:
-    drop-shadow(0 0 18px rgba(255, 56, 78, 0.92))
+    drop-shadow(0 0 18px rgba(52, 211, 153, 0.92))
     drop-shadow(0 6px 14px rgba(0, 0, 0, 0.9));
 }
 
-.theme-red .wallet-cyber-btn {
+.theme-green .wallet-cyber-btn {
   background:
     repeating-linear-gradient(
       90deg,
@@ -671,32 +671,32 @@
     ),
     linear-gradient(
       180deg,
-      #630b1e 0%,
-      #3a0612 48%,
-      #1c0208 100%
+      #095232 0%,
+      #05331e 48%,
+      #021a0f 100%
     );
   box-shadow:
-    inset 0 1px 1px rgba(255, 210, 218, 0.55),
+    inset 0 1px 1px rgba(167, 243, 208, 0.55),
     inset 0 -2px 5px rgba(0, 0, 0, 0.85);
 }
 
-.theme-red .wallet-cyber-btn::before {
-  background: linear-gradient(180deg, rgba(255, 180, 190, 0.24) 0%, rgba(255, 255, 255, 0) 100%);
+.theme-green .wallet-cyber-btn::before {
+  background: linear-gradient(180deg, rgba(167, 243, 208, 0.24) 0%, rgba(255, 255, 255, 0) 100%);
 }
 
-.theme-red .wallet-cyber-btn::after {
+.theme-green .wallet-cyber-btn::after {
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(254, 205, 211, 0.38) 50%,
+    rgba(167, 243, 208, 0.38) 50%,
     transparent 100%
   );
 }
 
-.theme-red ::-webkit-scrollbar-thumb {
-  background: rgba(255, 34, 58, 0.45);
+.theme-green ::-webkit-scrollbar-thumb {
+  background: rgba(16, 185, 129, 0.45);
 }
 
-.theme-red ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 64, 84, 0.82);
+.theme-green ::-webkit-scrollbar-thumb:hover {
+  background: rgba(52, 211, 153, 0.82);
 }
