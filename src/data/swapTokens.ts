@@ -23,6 +23,9 @@ export const PLATFORM_FEE_RECIPIENT = '0xcd4BDDeae498c7E303C153921b03da4b83FE846
 export const TAMI_FEE_ROUTER_ADDRESS =
   ((import.meta as unknown as { env?: Record<string, string | undefined> }).env
     ?.VITE_FEE_ROUTER_ADDRESS || '').trim();
+export const TAMIYANOIA_STAKING_ADDRESS =
+  ((import.meta as unknown as { env?: Record<string, string | undefined> }).env
+    ?.VITE_TAMIYANOIA_STAKING_ADDRESS || '').trim();
 
 export const BSC_RPC_URLS = [
   'https://bsc-dataseed1.binance.org',

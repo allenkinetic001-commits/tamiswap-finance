@@ -7,6 +7,7 @@ import { StakingView } from './components/StakingView';
 import { TopTokensView } from './components/TopTokensView';
 import { BSC_CHAIN_ID } from './data/swapTokens';
 import { ensureBscNetwork, parseChainId } from './utils/bscWeb3';
+import { TAMIYANOIA_TOKEN } from './utils/staking';
 import { TopTokenEntry, toSwapToken } from './utils/topTokens';
 
 interface InjectedProvider extends ethers.Eip1193Provider {
@@ -371,6 +372,17 @@ export default function App() {
   function handleSelectTokenForSwap(entry: TopTokenEntry) {
     setSelectedTokenRequest({
       token: toSwapToken(entry),
+      nonce: Date.now(),
+    });
+    setActiveTab('swap');
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  function handleBuyTamiyanoia() {
+    setSelectedTokenRequest({
+      token: TAMIYANOIA_TOKEN,
       nonce: Date.now(),
     });
     setActiveTab('swap');
@@ -921,6 +933,7 @@ export default function App() {
             provider={activeProvider}
             onConnectWallet={handleConnectButton}
             onSwitchToBsc={handleSwitchToBsc}
+            onBuyTamiyanoia={handleBuyTamiyanoia}
             isGreenMode={isGreenMode}
           />
         )}
