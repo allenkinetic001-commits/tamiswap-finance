@@ -1,6 +1,7 @@
 import { ethers } from 'ethers';
 import {
   PANCAKE_PAIR_FACTORY_ADDRESS,
+  PLATFORM_FEE_RECIPIENT,
   SwapToken,
   TAMIYANOIA_ADDRESS,
   TAMIYANOIA_STAKING_ADDRESS,
@@ -11,6 +12,10 @@ import {
   fetchOnChainQuote,
   getBscReadProvider,
 } from './bscWeb3';
+import {
+  TAMI_STAKING_BYTECODE,
+  TAMI_STAKING_COMPILED_ABI,
+} from './tamiStakingArtifact';
 
 export interface BnbStakingPool {
   id: 'slisbnb' | 'bnbx';
@@ -131,6 +136,7 @@ export const TAMI_STAKING_ABI = [
   'function claimReward() external',
   'function exit() external',
   'function fundRewards(uint256 amount, uint256 durationDays) external',
+  'function setFeeConfig(uint16 _stakeFeeBps, uint16 _unstakeFeeBps, address _treasury) external',
 ];
 
 const LISTA_MGR_ABI = [
@@ -383,6 +389,49 @@ export async function fundTamiyanoiaRewards(
     amountWei,
     BigInt(durationDays)
   )) as ethers.TransactionResponse;
+}
+
+export async function setTamiyanoiaFeeConfig(
+  ethereum: ethers.Eip1193Provider,
+  contractAddress: string,
+  stakeFeeBps: number,
+  unstakeFeeBps: number
+): Promise<ethers.TransactionResponse> {
+  await ensureBscNetwork(ethereum);
+  const browserProvider = new ethers.BrowserProvider(ethereum);
+  const signer = await browserProvider.getSigner();
+  const staking = new ethers.Contract(contractAddress, TAMI_STAKING_ABI, signer);
+  return (await staking.setFeeConfig(
+    stakeFeeBps,
+    unstakeFeeBps,
+    PLATFORM_FEE_RECIPIENT
+  )) as ethers.TransactionResponse;
+}
+
+export async function deployTamiyanoiaStakingContract(
+  ethereum: ethers.Eip1193Provider
+): Promise<{ contractAddress: string; txHash: string }> {
+  await ensureBscNetwork(ethereum);
+  const browserProvider = new ethers.BrowserProvider(ethereum);
+  const signer = await browserProvider.getSigner();
+  const signerAddress = await signer.getAddress();
+  const factory = new ethers.ContractFactory(
+    TAMI_STAKING_COMPILED_ABI,
+    TAMI_STAKING_BYTECODE,
+    signer
+  );
+  const contract = await factory.deploy(
+    TAMIYANOIA_ADDRESS,
+    PLATFORM_FEE_RECIPIENT,
+    signerAddress
+  );
+  const deployTx = contract.deploymentTransaction();
+  await contract.waitForDeployment();
+  const contractAddress = await contract.getAddress();
+  return {
+    contractAddress: ethers.getAddress(contractAddress),
+    txHash: deployTx?.hash || '',
+  };
 }
 
 export async function fetchLiveBnbStakingStats(): Promise<
