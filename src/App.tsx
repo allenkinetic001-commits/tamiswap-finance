@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { ethers } from 'ethers';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowLeftRight, BarChart3, Check, Copy, ExternalLink, Wallet, X } from 'lucide-react';
+import { ArrowLeftRight, BarChart3, Check, Coins, Copy, ExternalLink, Wallet, X } from 'lucide-react';
 import { ExternalTokenSelection, SwapWidget } from './components/SwapWidget';
+import { StakingView } from './components/StakingView';
 import { TopTokensView } from './components/TopTokensView';
 import { BSC_CHAIN_ID } from './data/swapTokens';
 import { ensureBscNetwork, parseChainId } from './utils/bscWeb3';
@@ -92,7 +93,7 @@ export default function App() {
   const [modalNotice, setModalNotice] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [isGreenMode, setIsGreenMode] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'swap' | 'top-tokens'>('swap');
+  const [activeTab, setActiveTab] = useState<'swap' | 'stake' | 'top-tokens'>('swap');
   const [selectedTokenRequest, setSelectedTokenRequest] =
     useState<ExternalTokenSelection | null>(null);
 
@@ -823,20 +824,20 @@ export default function App() {
       </header>
 
       <main className="relative z-10 flex flex-1 flex-col items-center justify-start px-4 pt-6 pb-10 sm:pt-9">
-        {/* Workspace Screen Switcher: Swap | Top 10 Tokens */}
-        <div className="armor-chassis-shell mb-5 w-full max-w-[340px]">
+        {/* Workspace Screen Switcher: Swap | Stake | Top 10 Tokens */}
+        <div className="armor-chassis-shell mb-5 w-full max-w-[440px]">
           <div className="armor-well-rim">
             <div
               role="tablist"
               aria-label="DEX sections"
-              className="armor-well grid grid-cols-2 gap-1.5 p-1.5"
+              className="armor-well grid grid-cols-3 gap-1.5 p-1.5"
             >
               <button
                 type="button"
                 role="tab"
                 aria-selected={activeTab === 'swap'}
                 onClick={() => setActiveTab('swap')}
-                className={`inline-flex items-center justify-center gap-2 px-3 py-2 font-display text-[11px] font-bold tracking-wider uppercase transition-all whitespace-nowrap ${
+                className={`inline-flex items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-2.5 py-2 font-display text-[10px] sm:text-[11px] font-bold tracking-wide sm:tracking-wider uppercase transition-all whitespace-nowrap shrink-0 ${
                   activeTab === 'swap'
                     ? 'combat-energy-btn text-white drop-shadow-[0_1px_2px_rgba(2,6,23,0.9)]'
                     : isGreenMode
@@ -844,15 +845,31 @@ export default function App() {
                     : 'border border-transparent text-slate-300 hover:border-sky-500/35 hover:text-white'
                 }`}
               >
-                <ArrowLeftRight className="h-3.5 w-3.5 shrink-0" />
+                <ArrowLeftRight className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
                 <span>Swap</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'stake'}
+                onClick={() => setActiveTab('stake')}
+                className={`inline-flex items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-2.5 py-2 font-display text-[10px] sm:text-[11px] font-bold tracking-wide sm:tracking-wider uppercase transition-all whitespace-nowrap shrink-0 ${
+                  activeTab === 'stake'
+                    ? 'combat-energy-btn text-white drop-shadow-[0_1px_2px_rgba(2,6,23,0.9)]'
+                    : isGreenMode
+                    ? 'border border-transparent text-slate-300 hover:border-emerald-500/35 hover:text-white'
+                    : 'border border-transparent text-slate-300 hover:border-sky-500/35 hover:text-white'
+                }`}
+              >
+                <Coins className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
+                <span>Stake</span>
               </button>
               <button
                 type="button"
                 role="tab"
                 aria-selected={activeTab === 'top-tokens'}
                 onClick={() => setActiveTab('top-tokens')}
-                className={`inline-flex items-center justify-center gap-2 px-3 py-2 font-display text-[11px] font-bold tracking-wider uppercase transition-all whitespace-nowrap ${
+                className={`inline-flex items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-2 font-display text-[10px] sm:text-[11px] font-bold tracking-wide sm:tracking-wider uppercase transition-all whitespace-nowrap shrink-0 ${
                   activeTab === 'top-tokens'
                     ? 'combat-energy-btn text-white drop-shadow-[0_1px_2px_rgba(2,6,23,0.9)]'
                     : isGreenMode
@@ -860,7 +877,7 @@ export default function App() {
                     : 'border border-transparent text-slate-300 hover:border-sky-500/35 hover:text-white'
                 }`}
               >
-                <BarChart3 className="h-3.5 w-3.5 shrink-0" />
+                <BarChart3 className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
                 <span>Top 10 Tokens</span>
               </button>
             </div>
@@ -896,6 +913,17 @@ export default function App() {
             isGreenMode={isGreenMode}
           />
         </div>
+
+        {activeTab === 'stake' && (
+          <StakingView
+            walletAddress={walletAddress}
+            chainId={chainId}
+            provider={activeProvider}
+            onConnectWallet={handleConnectButton}
+            onSwitchToBsc={handleSwitchToBsc}
+            isGreenMode={isGreenMode}
+          />
+        )}
 
         {activeTab === 'top-tokens' && (
           <TopTokensView

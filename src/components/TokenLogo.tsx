@@ -58,6 +58,12 @@ const SYMBOL_LOGO_FALLBACKS: Record<string, string[]> = {
     'https://coin-images.coingecko.com/coins/images/26037/large/Wiki-Logo.png',
     'https://cdn.dexscreener.com/cms/images/6012b7aeac14fd99318f10747e4deb40c0de61588e12e873621e354f4033a513?width=800&height=800&quality=95&format=auto',
   ],
+  SLISBNB: [
+    'https://coin-images.coingecko.com/coins/images/31101/small/slisBNB_200x200.png?1707363149',
+  ],
+  BNBX: [
+    'https://coin-images.coingecko.com/coins/images/26842/small/BNBx_Logo.png?1696525902',
+  ],
 };
 
 function BuiltInVectorFallback({ symbol, size }: { symbol: string; size: number }) {
