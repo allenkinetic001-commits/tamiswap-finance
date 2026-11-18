@@ -107,6 +107,7 @@ export function StakingView({
   );
   const [bindAddressInput, setBindAddressInput] = useState('');
   const [bindError, setBindError] = useState<string | null>(null);
+  const [showOwnerSetup, setShowOwnerSetup] = useState(false);
   const [showDeployGuide, setShowDeployGuide] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
@@ -718,7 +719,7 @@ export function StakingView({
                 TamiSwap Staking
               </h1>
               <p className="mt-1 text-xs text-slate-300">
-                TAMIYANOIA token pool &amp; live BNB Smart Chain liquid staking
+                Put your tokens to work and earn rewards — withdraw anytime
               </p>
             </div>
             <button
@@ -798,8 +799,8 @@ export function StakingView({
                   {tamiState?.isValidContract
                     ? tamiState.apyPct && tamiState.apyPct > 0
                       ? `${tamiState.apyPct.toFixed(1)}% APY`
-                      : 'Contract Live'
-                    : 'Activate'}
+                      : 'Live'
+                    : 'Soon'}
                 </span>
               </button>
 
@@ -862,7 +863,7 @@ export function StakingView({
                 <div className="armor-well grid grid-cols-3 divide-x divide-slate-700/60 px-2 py-2.5 text-center">
                   <div className="px-1">
                     <div className="text-[10px] font-medium tracking-wider text-slate-400 uppercase">
-                      Staking APY
+                      Reward Rate
                     </div>
                     <div
                       className={`mt-0.5 font-mono text-xs sm:text-sm font-bold tabular-nums ${
@@ -873,11 +874,11 @@ export function StakingView({
                         ? '...'
                         : tamiState?.isValidContract
                         ? tamiState.apyPct && tamiState.apyPct > 0
-                          ? `${tamiState.apyPct.toFixed(1)}%`
+                          ? `${tamiState.apyPct.toFixed(1)}% APY`
                           : tamiState.rewardReserveWei > 0n
                           ? 'Active Pool'
                           : '0% (No Rewards)'
-                        : 'Pending Deploy'}
+                        : 'Soon'}
                     </div>
                   </div>
                   <div className="px-1">
@@ -1275,13 +1276,13 @@ export function StakingView({
                   )}
                 </>
               ) : (
-                /* Pre-Deployment TAMIYANOIA Card (Zero Fake APY + Quick Buy + Owner Contract Activation) */
+                /* Pre-Deployment TAMIYANOIA Card (Layman-Friendly + Collapsible Owner Setup) */
                 <div className="relative z-10 space-y-3.5">
                   <div className="armor-well-rim">
-                    <div className="armor-well space-y-2.5 p-3.5 sm:p-4">
+                    <div className="armor-well space-y-3 p-4">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-display text-xs font-bold tracking-wider text-white uppercase">
-                          TAMIYANOIA Staking Vault Setup
+                        <span className="font-display text-xs sm:text-sm font-bold tracking-wider text-white uppercase">
+                          TAMIYANOIA Staking — Launching Soon
                         </span>
                         <a
                           href={`https://bscscan.com/token/${TAMIYANOIA_ADDRESS}`}
@@ -1291,21 +1292,20 @@ export function StakingView({
                             isGreenMode ? 'text-emerald-300' : 'text-sky-300'
                           }`}
                         >
-                          <span>Token BscScan</span>
+                          <span>Token Info</span>
                           <ExternalLink className="h-3 w-3" />
                         </a>
                       </div>
                       <p className="text-xs leading-relaxed text-slate-300">
-                        TAMIYANOIA rewards come from a dedicated BNB Smart Chain staking vault
-                        funded by the project treasury. Deploy{' '}
-                        <span className="font-mono text-slate-100">TamiyanoiaStaking.sol</span>{' '}
-                        from your wallet and paste the contract address below to activate live
-                        staking &amp; rewards for all holders.
+                        Soon you&apos;ll be able to lock your <span className="font-semibold text-white">TAMIYANOIA</span> tokens
+                        right here to earn extra TAMIYANOIA rewards. While the vault is being
+                        finalized, you can buy TAMIYANOIA or stake your BNB right now to earn
+                        live rewards!
                       </p>
 
                       {tamiPair && (
                         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-700/60 pt-2.5 text-[11px]">
-                          <span className="text-slate-400">Live PancakeSwap V2 rate</span>
+                          <span className="text-slate-400">Current Swap Rate</span>
                           <span className="font-mono font-semibold text-slate-100 tabular-nums">
                             1 BNB ≈ {formatAmount(String(tamiPair.tamiPerBnb), 0)} TAMIYANOIA
                           </span>
@@ -1317,7 +1317,7 @@ export function StakingView({
                           <button
                             type="button"
                             onClick={onBuyTamiyanoia}
-                            className="combat-energy-btn font-display flex items-center justify-center gap-1.5 px-3 py-2.5 text-[11px] font-extrabold tracking-wider text-white uppercase"
+                            className="combat-energy-btn font-display flex items-center justify-center gap-1.5 px-3 py-3 text-[11px] font-extrabold tracking-wider text-white uppercase"
                           >
                             <ArrowRightLeft className="h-3.5 w-3.5" />
                             <span>Buy TAMIYANOIA</span>
@@ -1326,7 +1326,7 @@ export function StakingView({
                         <button
                           type="button"
                           onClick={() => setSelectedPoolId('slisbnb')}
-                          className="combat-steel-btn font-display flex items-center justify-center gap-1.5 px-3 py-2.5 text-[11px] font-bold tracking-wider text-slate-100 uppercase"
+                          className="combat-steel-btn font-display flex items-center justify-center gap-1.5 px-3 py-3 text-[11px] font-bold tracking-wider text-slate-100 uppercase"
                         >
                           <Coins className="h-3.5 w-3.5" />
                           <span>Stake BNB Now</span>
@@ -1335,105 +1335,121 @@ export function StakingView({
                     </div>
                   </div>
 
-                  {/* Activate Deployed Contract Panel */}
-                  <div className="armor-well-rim">
-                    <div className="armor-well space-y-2.5 p-3.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-display text-[11px] font-bold tracking-wider text-slate-200 uppercase">
-                          Connect Deployed Staking Contract
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setShowDeployGuide((prev) => !prev)}
-                          className={`font-mono text-[11px] font-semibold hover:underline ${
-                            isGreenMode ? 'text-emerald-300' : 'text-cyan-300'
-                          }`}
-                        >
-                          {showDeployGuide ? 'Hide Deploy Info' : 'Deploy Guide'}
-                        </button>
-                      </div>
-
-                      {showDeployGuide && (
-                        <div className="space-y-2 border border-slate-700/70 bg-[#050a14]/90 p-2.5 text-[11px] text-slate-300">
-                          <div>
-                            1. Open{' '}
-                            <span className="font-mono text-white">remix.ethereum.org</span>{' '}
-                            with{' '}
-                            <span className="font-mono text-white">TamiyanoiaStaking.sol</span>{' '}
-                            and select <span className="text-white">BNB Smart Chain</span>.
-                          </div>
-                          <div>2. Deploy with these 3 constructor addresses:</div>
-                          <div className="space-y-1 font-mono text-[10px]">
-                            {[
-                              {
-                                key: 'token',
-                                label: '_stakingToken',
-                                val: TAMIYANOIA_ADDRESS,
-                              },
-                              {
-                                key: 'treasury',
-                                label: '_treasury',
-                                val: PLATFORM_FEE_RECIPIENT,
-                              },
-                              {
-                                key: 'owner',
-                                label: '_initialOwner',
-                                val: PLATFORM_FEE_RECIPIENT,
-                              },
-                            ].map((item) => (
-                              <div
-                                key={item.key}
-                                className="flex items-center justify-between gap-2 border border-slate-800 bg-[#070f1d] px-2 py-1"
-                              >
-                                <span className="truncate">
-                                  <span className="text-slate-400">{item.label}: </span>
-                                  <span className="text-slate-100">{item.val}</span>
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleCopyValue(item.key, item.val)}
-                                  className="shrink-0 text-slate-300 hover:text-white"
-                                >
-                                  {copiedField === item.key ? (
-                                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-                                  ) : (
-                                    <Copy className="h-3.5 w-3.5" />
-                                  )}
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                          <div>
-                            3. Paste the deployed contract address below (or send it to lock
-                            it into TamiSwap for all users).
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={bindAddressInput}
-                          onChange={(e) => {
-                            setBindAddressInput(e.target.value);
-                            setBindError(null);
-                          }}
-                          placeholder="0x... deployed TamiyanoiaStaking address"
-                          className="min-w-0 flex-1 border border-slate-700 bg-[#050a14] px-2.5 py-2 font-mono text-xs text-white placeholder-slate-500 focus:border-cyan-400 focus:outline-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleBindTamiContract}
-                          className="combat-steel-btn shrink-0 px-3 py-2 font-display text-[11px] font-bold tracking-wider text-white uppercase"
-                        >
-                          Activate
-                        </button>
-                      </div>
-                      {bindError && (
-                        <div className="text-[11px] text-red-300">{bindError}</div>
-                      )}
-                    </div>
+                  {/* Subtle Owner Toggle so Regular Users Aren't Confused */}
+                  <div className="text-center">
+                    <button
+                      type="button"
+                      onClick={() => setShowOwnerSetup((prev) => !prev)}
+                      className="inline-flex items-center gap-1.5 font-mono text-[11px] text-slate-400 transition-colors hover:text-slate-200"
+                    >
+                      <KeyRound className="h-3 w-3" />
+                      <span>
+                        {showOwnerSetup || isOwnerWallet
+                          ? 'Hide Owner Contract Setup'
+                          : 'Project Owner? Connect Staking Contract'}
+                      </span>
+                    </button>
                   </div>
+
+                  {(showOwnerSetup || isOwnerWallet) && (
+                    <div className="armor-well-rim">
+                      <div className="armor-well space-y-2.5 p-3.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-display text-[11px] font-bold tracking-wider text-slate-200 uppercase">
+                            Owner: Connect Deployed Staking Contract
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setShowDeployGuide((prev) => !prev)}
+                            className={`font-mono text-[11px] font-semibold hover:underline ${
+                              isGreenMode ? 'text-emerald-300' : 'text-cyan-300'
+                            }`}
+                          >
+                            {showDeployGuide ? 'Hide Deploy Info' : 'Deploy Guide'}
+                          </button>
+                        </div>
+
+                        {showDeployGuide && (
+                          <div className="space-y-2 border border-slate-700/70 bg-[#050a14]/90 p-2.5 text-[11px] text-slate-300">
+                            <div>
+                              1. Open{' '}
+                              <span className="font-mono text-white">remix.ethereum.org</span>{' '}
+                              with{' '}
+                              <span className="font-mono text-white">TamiyanoiaStaking.sol</span>{' '}
+                              and select <span className="text-white">BNB Smart Chain</span>.
+                            </div>
+                            <div>2. Deploy with these 3 constructor addresses:</div>
+                            <div className="space-y-1 font-mono text-[10px]">
+                              {[
+                                {
+                                  key: 'token',
+                                  label: '_stakingToken',
+                                  val: TAMIYANOIA_ADDRESS,
+                                },
+                                {
+                                  key: 'treasury',
+                                  label: '_treasury',
+                                  val: PLATFORM_FEE_RECIPIENT,
+                                },
+                                {
+                                  key: 'owner',
+                                  label: '_initialOwner',
+                                  val: PLATFORM_FEE_RECIPIENT,
+                                },
+                              ].map((item) => (
+                                <div
+                                  key={item.key}
+                                  className="flex items-center justify-between gap-2 border border-slate-800 bg-[#070f1d] px-2 py-1"
+                                >
+                                  <span className="truncate">
+                                    <span className="text-slate-400">{item.label}: </span>
+                                    <span className="text-slate-100">{item.val}</span>
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyValue(item.key, item.val)}
+                                    className="shrink-0 text-slate-300 hover:text-white"
+                                  >
+                                    {copiedField === item.key ? (
+                                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                                    ) : (
+                                      <Copy className="h-3.5 w-3.5" />
+                                    )}
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                            <div>
+                              3. Paste the deployed contract address below to activate staking.
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={bindAddressInput}
+                            onChange={(e) => {
+                              setBindAddressInput(e.target.value);
+                              setBindError(null);
+                            }}
+                            placeholder="0x... deployed TamiyanoiaStaking address"
+                            className="min-w-0 flex-1 border border-slate-700 bg-[#050a14] px-2.5 py-2 font-mono text-xs text-white placeholder-slate-500 focus:border-cyan-400 focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleBindTamiContract}
+                            className="combat-steel-btn shrink-0 px-3 py-2 font-display text-[11px] font-bold tracking-wider text-white uppercase"
+                          >
+                            Activate
+                          </button>
+                        </div>
+                        {bindError && (
+                          <div className="text-[11px] text-red-300">{bindError}</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -1488,6 +1504,13 @@ export function StakingView({
                     )}
                   </div>
                 </div>
+              </div>
+
+              {/* Layman Helper Note */}
+              <div className="relative z-10 mb-3 px-1 text-[11px] leading-relaxed text-slate-300">
+                {action === 'stake'
+                  ? `Put BNB in to get ${activeBnbPool.token.symbol}, which automatically grows in BNB value over time. Swap back anytime to collect rewards.`
+                  : `Swap your ${activeBnbPool.token.symbol} back into regular BNB + your earned staking rewards anytime.`}
               </div>
 
               {/* Stake / Unstake Toggle */}
