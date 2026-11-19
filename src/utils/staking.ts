@@ -16,10 +16,6 @@ import {
   sendWalletTransaction,
   SubmittedTx,
 } from './bscWeb3';
-import {
-  TAMI_STAKING_BYTECODE,
-  TAMI_STAKING_COMPILED_ABI,
-} from './tamiStakingArtifact';
 
 export interface BnbStakingPool {
   id: 'slisbnb' | 'bnbx';
@@ -450,6 +446,9 @@ export async function deployTamiyanoiaStakingContract(
   await ensureBscNetwork(ethereum);
   const from = await getWalletSenderAddress(ethereum);
   const readProvider = await getBscReadProvider();
+  const { TAMI_STAKING_COMPILED_ABI, TAMI_STAKING_BYTECODE } = await import(
+    './tamiStakingArtifact'
+  );
   const factory = new ethers.ContractFactory(
     TAMI_STAKING_COMPILED_ABI,
     TAMI_STAKING_BYTECODE

@@ -1,14 +1,50 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { ethers } from 'ethers';
 import { AnimatePresence, motion } from 'motion/react';
 import { ArrowLeftRight, BarChart3, Check, Coins, Copy, ExternalLink, Wallet, X } from 'lucide-react';
 import { ExternalTokenSelection, SwapWidget } from './components/SwapWidget';
-import { StakingView } from './components/StakingView';
-import { TopTokensView } from './components/TopTokensView';
 import { BSC_CHAIN_ID } from './data/swapTokens';
-import { ensureBscNetwork, parseChainId } from './utils/bscWeb3';
+import { ensureBscNetwork, formatWalletError, parseChainId } from './utils/bscWeb3';
 import { TAMIYANOIA_TOKEN } from './utils/staking';
-import { TopTokenEntry, toSwapToken } from './utils/topTokens';
+import type { TopTokenEntry } from './utils/topTokens';
+
+const StakingView = lazy(() =>
+  import('./components/StakingView').then((m) => ({ default: m.StakingView }))
+);
+const TopTokensView = lazy(() =>
+  import('./components/TopTokensView').then((m) => ({ default: m.TopTokensView }))
+);
+
+const PUBLIC_DAPP_URL = 'https://tamiswap-finance.vercel.app';
+
+function resolvePublicDappUrl(): string {
+  if (typeof window === 'undefined') return PUBLIC_DAPP_URL;
+  const host = window.location.hostname.toLowerCase();
+  if (
+    !host ||
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host.endsWith('.run.app')
+  ) {
+    return PUBLIC_DAPP_URL;
+  }
+  return window.location.href;
+}
+
+function detectWalletBrowserUA(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  return /Trust|MetaMaskMobile|SafePal|OKApp|BitKeep|Bitget|Binance|TokenPocket|imToken|CoinbaseWallet/i.test(
+    ua
+  );
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
+  ]);
+}
 
 interface InjectedProvider extends ethers.Eip1193Provider {
   on?: (event: string, listener: (...args: unknown[]) => void) => void;
@@ -98,6 +134,12 @@ export default function App() {
   const [selectedTokenRequest, setSelectedTokenRequest] =
     useState<ExternalTokenSelection | null>(null);
 
+  const [isInWalletBrowser, setIsInWalletBrowser] = useState<boolean>(() =>
+    detectWalletBrowserUA()
+  );
+  const discoveredMapRef = useRef<Map<string, DiscoveredWallet>>(new Map());
+  const restoredAttemptedRef = useRef(false);
+
   useEffect(() => {
     try {
       window.localStorage.removeItem('tamiswap_red_mode');
@@ -107,14 +149,8 @@ export default function App() {
     }
   }, []);
 
-  // Discover EIP-6963 wallets asynchronously + injected browser/mobile wallet globals
-  useEffect(() => {
-    const map = new Map<string, DiscoveredWallet>();
-
-    const syncFromMap = () => {
-      const list = Array.from(map.values());
-      setWallets(list);
-    };
+  const scanInjectedWallets = useCallback((): DiscoveredWallet[] => {
+    const map = discoveredMapRef.current;
 
     function addCandidate(
       id: string,
@@ -144,23 +180,6 @@ export default function App() {
       if (sameProvider) return;
       map.set(canonicalKey, { id: canonicalKey, name: displayName, icon, provider });
     }
-
-    function onAnnounce(event: Event) {
-      const e = event as Eip6963AnnounceEvent;
-      if (e.detail?.provider && e.detail?.info) {
-        addCandidate(
-          e.detail.info.rdns || e.detail.info.uuid,
-          e.detail.info.name,
-          e.detail.provider,
-          e.detail.info.icon,
-          true
-        );
-        syncFromMap();
-      }
-    }
-
-    window.addEventListener('eip6963:announceProvider', onAnnounce);
-    window.dispatchEvent(new Event('eip6963:requestProvider'));
 
     const win = window as unknown as {
       ethereum?: InjectedProvider;
@@ -202,49 +221,93 @@ export default function App() {
       }
     }
 
-    syncFromMap();
-
-    // Auto-restore already-authorized session if any wallet is already unlocked & permitted
-    const candidates = Array.from(map.values());
-    if (candidates.length > 0) {
-      (async () => {
-        for (const candidate of candidates) {
-          try {
-            const accs = (await candidate.provider.request({
-              method: 'eth_accounts',
-            })) as string[];
-            if (accs && accs[0]) {
-              setActiveProvider(candidate.provider);
-              setWalletAddress(ethers.getAddress(accs[0]));
-              const hex = await candidate.provider.request({
-                method: 'eth_chainId',
-              });
-              let restoredChain = parseChainId(hex);
-              if (restoredChain !== BSC_CHAIN_ID) {
-                try {
-                  await ensureBscNetwork(candidate.provider);
-                  const updatedHex = await candidate.provider.request({
-                    method: 'eth_chainId',
-                  });
-                  restoredChain = parseChainId(updatedHex);
-                } catch {
-                  // Keep restored chain accurate so Switch to BNB Chain button appears
-                }
-              }
-              setChainId(restoredChain);
-              break;
-            }
-          } catch {
-            // ignore silent restore errors
-          }
-        }
-      })();
+    const list = Array.from(map.values());
+    setWallets(list);
+    if (detectWalletBrowserUA() || Boolean(win.trustwallet || win.safepalProvider || win.ethereum?.isTrust || win.ethereum?.isTrustWallet)) {
+      setIsInWalletBrowser(true);
     }
+    return list;
+  }, []);
+
+  const trySilentRestore = useCallback(async (candidates: DiscoveredWallet[]) => {
+    if (restoredAttemptedRef.current || candidates.length === 0) return;
+    restoredAttemptedRef.current = true;
+    for (const candidate of candidates) {
+      try {
+        const accs = (await withTimeout(
+          candidate.provider.request({ method: 'eth_accounts' }) as Promise<string[]>,
+          2500
+        )) as string[];
+        if (accs && accs[0] && ethers.isAddress(accs[0])) {
+          setActiveProvider(candidate.provider);
+          setWalletAddress(ethers.getAddress(accs[0]));
+          try {
+            const hex = await withTimeout(
+              candidate.provider.request({ method: 'eth_chainId' }),
+              2000
+            );
+            setChainId(parseChainId(hex));
+          } catch {
+            // ignore silent chainId timeout; user can switch manually on demand
+          }
+          break;
+        }
+      } catch {
+        // ignore silent restore errors
+      }
+    }
+  }, []);
+
+  // Discover EIP-6963 wallets + delayed mobile WebView injected providers (Trust Wallet, SafePal, Binance, MetaMask)
+  useEffect(() => {
+    function onAnnounce(event: Event) {
+      const e = event as Eip6963AnnounceEvent;
+      if (e.detail?.provider && e.detail?.info && typeof e.detail.provider.request === 'function') {
+        const canonicalKey = normalizeWalletKey(
+          e.detail.info.name,
+          e.detail.info.rdns || e.detail.info.uuid
+        );
+        const displayName =
+          canonicalKey === 'trust-wallet' ? 'Trust Wallet' : e.detail.info.name;
+        discoveredMapRef.current.set(canonicalKey, {
+          id: canonicalKey,
+          name: displayName,
+          icon: e.detail.info.icon,
+          provider: e.detail.provider,
+        });
+        const list = Array.from(discoveredMapRef.current.values());
+        setWallets(list);
+        void trySilentRestore(list);
+      }
+    }
+
+    const rescan = () => {
+      const found = scanInjectedWallets();
+      if (found.length > 0) {
+        void trySilentRestore(found);
+      }
+    };
+
+    window.addEventListener('eip6963:announceProvider', onAnnounce);
+    window.addEventListener('ethereum#initialized', rescan);
+    window.addEventListener('load', rescan);
+    window.dispatchEvent(new Event('eip6963:requestProvider'));
+
+    rescan();
+    const timers = [150, 500, 1200, 2500].map((delay) =>
+      window.setTimeout(() => {
+        window.dispatchEvent(new Event('eip6963:requestProvider'));
+        rescan();
+      }, delay)
+    );
 
     return () => {
       window.removeEventListener('eip6963:announceProvider', onAnnounce);
+      window.removeEventListener('ethereum#initialized', rescan);
+      window.removeEventListener('load', rescan);
+      timers.forEach((id) => window.clearTimeout(id));
     };
-  }, []);
+  }, [scanInjectedWallets, trySilentRestore]);
 
   // Subscribe to account & chain updates from the connected wallet
   useEffect(() => {
@@ -273,11 +336,13 @@ export default function App() {
   async function connectWithProvider(chosen: InjectedProvider) {
     setWalletNotice(null);
     setShowWalletModal(false);
+    let accountConnected = false;
     try {
       const accounts = (await chosen.request({
         method: 'eth_requestAccounts',
       })) as string[];
-      if (accounts && accounts[0]) {
+      if (accounts && accounts[0] && ethers.isAddress(accounts[0])) {
+        accountConnected = true;
         setActiveProvider(chosen);
         setWalletAddress(ethers.getAddress(accounts[0]));
       }
@@ -303,22 +368,25 @@ export default function App() {
       } catch {
         // ignore read failure
       }
-      const msg =
-        err instanceof Error
-          ? err.message
-          : typeof err === 'object' &&
-            err !== null &&
-            'message' in err &&
-            typeof (err as { message?: unknown }).message === 'string'
-          ? (err as { message: string }).message
-          : 'Wallet connection was rejected.';
-      setWalletNotice(msg);
+      if (accountConnected) {
+        setWalletNotice(
+          'Wallet connected! Tap "Switch to BNB Chain" above (or pick BNB Smart Chain in your wallet top bar).'
+        );
+      } else {
+        setWalletNotice(formatWalletError(err));
+      }
     }
   }
 
   function handleConnectButton() {
     setWalletNotice(null);
     setModalNotice(null);
+    window.dispatchEvent(new Event('eip6963:requestProvider'));
+    const latest = scanInjectedWallets();
+    if (!walletAddress && isInWalletBrowser && latest.length === 1) {
+      void connectWithProvider(latest[0].provider);
+      return;
+    }
     setShowWalletModal(true);
   }
 
@@ -330,9 +398,7 @@ export default function App() {
       const hex = await activeProvider.request({ method: 'eth_chainId' });
       setChainId(parseChainId(hex));
     } catch (err: unknown) {
-      setWalletNotice(
-        err instanceof Error ? err.message : 'Could not switch network to BNB Smart Chain.'
-      );
+      setWalletNotice(formatWalletError(err));
     }
   }
 
@@ -346,7 +412,7 @@ export default function App() {
   async function handleCopySiteUrl() {
     if (typeof window === 'undefined') return;
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      await navigator.clipboard.writeText(resolvePublicDappUrl());
       setCopiedUrl(true);
       setTimeout(() => setCopiedUrl(false), 2000);
     } catch {
@@ -354,24 +420,64 @@ export default function App() {
     }
   }
 
-  function handleBinanceWalletClick(e: React.MouseEvent<HTMLAnchorElement>) {
-    const detectedBinance = wallets.find((w) =>
-      w.name.toLowerCase().includes('binance')
-    );
-    if (detectedBinance) {
+  function handleMobileWalletClick(
+    e: React.MouseEvent<HTMLAnchorElement>,
+    wallet: { id: string; name: string; href: string; nativeHref?: string }
+  ) {
+    const matchedInjected = wallets.find((w) => {
+      const n = w.name.toLowerCase();
+      if (wallet.id === 'trust') return n.includes('trust');
+      if (wallet.id === 'metamask') return n.includes('metamask');
+      if (wallet.id === 'binance') return n.includes('binance');
+      if (wallet.id === 'okx') return n.includes('okx');
+      if (wallet.id === 'coinbase') return n.includes('coinbase');
+      if (wallet.id === 'safepal') return n.includes('safepal');
+      if (wallet.id === 'bitget') return n.includes('bitget');
+      return false;
+    });
+    if (matchedInjected) {
       e.preventDefault();
-      connectWithProvider(detectedBinance.provider);
+      void connectWithProvider(matchedInjected.provider);
       return;
     }
-    handleCopySiteUrl();
+
+    e.preventDefault();
+    void handleCopySiteUrl();
+
+    if (wallet.id === 'binance') {
+      setModalNotice(
+        'DApp link copied! Opening Binance App — go to Wallets → Web3 → Discover and paste the link.'
+      );
+      window.location.href = wallet.href;
+      return;
+    }
+
     setModalNotice(
-      'DApp URL copied! Opening Binance App — go to Wallets → Web3 → Discover and paste the URL.'
+      `Opening ${wallet.name}... Backup link copied in case your phone asks you to paste it in the wallet Browser.`
     );
+
+    if (wallet.nativeHref) {
+      window.location.href = wallet.nativeHref;
+      window.setTimeout(() => {
+        if (document.visibilityState === 'visible') {
+          window.location.href = wallet.href;
+        }
+      }, 900);
+    } else {
+      window.location.href = wallet.href;
+    }
   }
 
   function handleSelectTokenForSwap(entry: TopTokenEntry) {
     setSelectedTokenRequest({
-      token: toSwapToken(entry),
+      token: {
+        symbol: entry.symbol,
+        name: entry.name,
+        address: entry.address,
+        decimals: entry.decimals,
+        isNative: entry.isNative,
+        logoURI: entry.logoURI,
+      },
       nonce: Date.now(),
     });
     setActiveTab('swap');
@@ -392,28 +498,26 @@ export default function App() {
   }
 
   const wrongNetwork = Boolean(walletAddress) && chainId !== null && chainId !== BSC_CHAIN_ID;
-  const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
-  const dappHostPath =
-    typeof window !== 'undefined'
-      ? `${window.location.host}${window.location.pathname}${window.location.search}`
-      : '';
-  const mobileWalletLinks = currentUrl
+  const launchUrl = resolvePublicDappUrl();
+  const launchHostPath = launchUrl.replace(/^https?:\/\//i, '');
+  const mobileWalletLinks = launchUrl
     ? [
-        {
-          id: 'metamask',
-          name: 'MetaMask',
-          icon: '/assets/wallets/metamask.png',
-          iconBg: 'bg-white',
-          href: `https://metamask.app.link/dapp/${dappHostPath}`,
-        },
         {
           id: 'trust',
           name: 'Trust Wallet',
           icon: '/assets/wallets/trustwallet.png',
           iconBg: 'bg-white',
+          nativeHref: `trust://open_url?coin_id=20000714&url=${encodeURIComponent(launchUrl)}`,
           href: `https://link.trustwallet.com/open_url?coin_id=20000714&url=${encodeURIComponent(
-            currentUrl
+            launchUrl
           )}`,
+        },
+        {
+          id: 'metamask',
+          name: 'MetaMask',
+          icon: '/assets/wallets/metamask.png',
+          iconBg: 'bg-white',
+          href: `https://metamask.app.link/dapp/${launchHostPath}`,
         },
         {
           id: 'binance',
@@ -427,8 +531,9 @@ export default function App() {
           name: 'OKX Wallet',
           icon: '/assets/wallets/okx.png',
           iconBg: 'bg-black',
+          nativeHref: `okx://wallet/dapp/url?dappUrl=${encodeURIComponent(launchUrl)}`,
           href: `https://www.okx.com/download?deeplink=${encodeURIComponent(
-            `okx://wallet/dapp/url?dappUrl=${encodeURIComponent(currentUrl)}`
+            `okx://wallet/dapp/url?dappUrl=${encodeURIComponent(launchUrl)}`
           )}`,
         },
         {
@@ -436,21 +541,21 @@ export default function App() {
           name: 'Coinbase Wallet',
           icon: '/assets/wallets/coinbase.png',
           iconBg: 'bg-white',
-          href: `https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(currentUrl)}`,
+          href: `https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(launchUrl)}`,
         },
         {
           id: 'safepal',
           name: 'SafePal Wallet',
           icon: '/assets/wallets/safepal.png',
           iconBg: 'bg-white',
-          href: `https://link.safepal.io/open_url?url=${encodeURIComponent(currentUrl)}`,
+          href: `https://link.safepal.io/open_url?url=${encodeURIComponent(launchUrl)}`,
         },
         {
           id: 'bitget',
           name: 'Bitget Wallet',
           icon: '/assets/wallets/bitget.png',
           iconBg: 'bg-[#0B1222]',
-          href: `https://bkcode.vip?action=dapp&url=${encodeURIComponent(currentUrl)}`,
+          href: `https://bkcode.vip?action=dapp&url=${encodeURIComponent(launchUrl)}`,
         },
       ]
     : [];
@@ -927,22 +1032,38 @@ export default function App() {
         </div>
 
         {activeTab === 'stake' && (
-          <StakingView
-            walletAddress={walletAddress}
-            chainId={chainId}
-            provider={activeProvider}
-            onConnectWallet={handleConnectButton}
-            onSwitchToBsc={handleSwitchToBsc}
-            onBuyTamiyanoia={handleBuyTamiyanoia}
-            isGreenMode={isGreenMode}
-          />
+          <Suspense
+            fallback={
+              <div className="py-10 text-center font-mono text-xs text-slate-400">
+                Loading Staking Vault...
+              </div>
+            }
+          >
+            <StakingView
+              walletAddress={walletAddress}
+              chainId={chainId}
+              provider={activeProvider}
+              onConnectWallet={handleConnectButton}
+              onSwitchToBsc={handleSwitchToBsc}
+              onBuyTamiyanoia={handleBuyTamiyanoia}
+              isGreenMode={isGreenMode}
+            />
+          </Suspense>
         )}
 
         {activeTab === 'top-tokens' && (
-          <TopTokensView
-            onSelectTokenForSwap={handleSelectTokenForSwap}
-            isGreenMode={isGreenMode}
-          />
+          <Suspense
+            fallback={
+              <div className="py-10 text-center font-mono text-xs text-slate-400">
+                Loading Top 10 Tokens...
+              </div>
+            }
+          >
+            <TopTokensView
+              onSelectTokenForSwap={handleSelectTokenForSwap}
+              isGreenMode={isGreenMode}
+            />
+          </Suspense>
         )}
       </main>
 
@@ -1096,13 +1217,7 @@ export default function App() {
                             <a
                               key={wallet.id}
                               href={wallet.href}
-                              target={wallet.id === 'binance' ? undefined : '_blank'}
-                              rel={wallet.id === 'binance' ? undefined : 'noopener noreferrer'}
-                              onClick={
-                                wallet.id === 'binance'
-                                  ? handleBinanceWalletClick
-                                  : undefined
-                              }
+                              onClick={(e) => handleMobileWalletClick(e, wallet)}
                               className="combat-steel-btn flex items-center justify-between gap-1.5 px-2.5 py-2.5 text-xs font-semibold text-slate-100"
                             >
                               <span className="flex min-w-0 items-center gap-2">

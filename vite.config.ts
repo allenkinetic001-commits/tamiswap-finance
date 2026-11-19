@@ -29,5 +29,9 @@ export default defineConfig(() => {
       port: 3000,
       allowedHosts: true as const,
     },
+    build: {
+      target: 'es2020',
+      cssTarget: 'chrome90',
+    },
   };
 });
