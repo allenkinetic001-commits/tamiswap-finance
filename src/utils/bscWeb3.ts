@@ -291,11 +291,70 @@ function extractWalletErrorCode(err: unknown): number | undefined {
   return undefined;
 }
 
+function collectErrorMessages(err: unknown, depth = 0): string[] {
+  if (!err || depth > 4) return [];
+  if (typeof err === 'string') return [err];
+  if (typeof err !== 'object') return [];
+  const e = err as Record<string, unknown>;
+  const out: string[] = [];
+  for (const key of ['shortMessage', 'reason', 'message']) {
+    if (typeof e[key] === 'string' && e[key]) out.push(e[key] as string);
+  }
+  for (const nested of ['info', 'error', 'data', 'originalError', 'cause']) {
+    if (e[nested]) out.push(...collectErrorMessages(e[nested], depth + 1));
+  }
+  return out;
+}
+
 function isUserRejectedWalletError(err: unknown): boolean {
   const code = extractWalletErrorCode(err);
   if (code === 4001) return true;
-  const msg = err instanceof Error ? err.message.toLowerCase() : String(err || '').toLowerCase();
-  return msg.includes('user rejected') || msg.includes('user denied') || msg.includes('rejected the request');
+  const msg = collectErrorMessages(err).join(' ').toLowerCase();
+  return (
+    msg.includes('user rejected') ||
+    msg.includes('user denied') ||
+    msg.includes('rejected the request') ||
+    msg.includes('cancelled') ||
+    msg.includes('canceled')
+  );
+}
+
+export function formatWalletError(err: unknown): string {
+  if (isUserRejectedWalletError(err)) {
+    return 'Transaction cancelled in wallet.';
+  }
+  const allMsgs = collectErrorMessages(err);
+  const joined = allMsgs.join(' | ').toLowerCase();
+
+  if (joined.includes('insufficient funds') || joined.includes('exceeds balance')) {
+    return 'Not enough BNB in your wallet to cover the swap amount plus gas fee.';
+  }
+  if (
+    joined.includes('return amount is not enough') ||
+    joined.includes('insufficient_output_amount') ||
+    joined.includes('minreturn') ||
+    joined.includes('too little received')
+  ) {
+    return 'Price moved or this token has a transfer tax — raise Slippage (e.g. 3% or 5%) in Settings and try again.';
+  }
+  if (joined.includes('transfer_from_failed') || joined.includes('allowance')) {
+    return 'Token approval too low or token transfer blocked — approve again or increase Slippage in Settings.';
+  }
+  if (joined.includes('deadline') || joined.includes('expired')) {
+    return 'Swap quote expired — please refresh and try again.';
+  }
+
+  // Prefer the most specific inner message that isn't ethers' generic "could not coalesce error"
+  const meaningful = allMsgs.find(
+    (m) =>
+      m.trim().length > 0 &&
+      !m.toLowerCase().includes('could not coalesce error') &&
+      !m.toLowerCase().includes('unknown_error')
+  );
+  if (meaningful) {
+    return meaningful.replace(/^execution reverted:\s*/i, '').slice(0, 220);
+  }
+  return 'Wallet RPC error — check you have enough BNB for gas, refresh the quote, or increase Slippage in Settings.';
 }
 
 export async function ensureBscNetwork(ethereum: ethers.Eip1193Provider): Promise<void> {
@@ -696,6 +755,119 @@ export async function fetchOnChainQuote(params: {
   };
 }
 
+export interface SubmittedTx {
+  hash: string;
+  wait: () => Promise<ethers.TransactionReceipt | null>;
+}
+
+async function getWalletSenderAddress(ethereum: ethers.Eip1193Provider): Promise<string> {
+  const accounts = (await ethereum.request({ method: 'eth_accounts' })) as string[] | null;
+  if (accounts && accounts.length > 0 && ethers.isAddress(accounts[0])) {
+    return ethers.getAddress(accounts[0]);
+  }
+  const requested = (await ethereum.request({
+    method: 'eth_requestAccounts',
+  })) as string[] | null;
+  if (requested && requested.length > 0 && ethers.isAddress(requested[0])) {
+    return ethers.getAddress(requested[0]);
+  }
+  throw new Error('No wallet account connected.');
+}
+
+async function estimateBscGasSafe(
+  readProvider: ethers.JsonRpcProvider,
+  tx: { from: string; to: string; data: string; value: bigint },
+  fallbackGas: bigint
+): Promise<bigint> {
+  try {
+    const est = await readProvider.estimateGas(tx);
+    // Add 30% safety headroom so fee-on-transfer / multi-hop swaps never run out of gas
+    const buffered = (est * 130n) / 100n;
+    return buffered > fallbackGas ? buffered : fallbackGas;
+  } catch (err: unknown) {
+    const msg = collectErrorMessages(err).join(' ').toLowerCase();
+    const isRealRevert =
+      msg.includes('revert') ||
+      msg.includes('insufficient') ||
+      msg.includes('return amount') ||
+      msg.includes('transfer_from_failed') ||
+      msg.includes('allowance') ||
+      msg.includes('expired') ||
+      msg.includes('call_exception');
+    if (isRealRevert) {
+      throw err;
+    }
+    return fallbackGas;
+  }
+}
+
+async function sendWalletTransaction(params: {
+  ethereum: ethers.Eip1193Provider;
+  from: string;
+  to: string;
+  data: string;
+  valueWei: bigint;
+  readProvider: ethers.JsonRpcProvider;
+  gasLimit: bigint;
+}): Promise<SubmittedTx> {
+  const { ethereum, from, to, data, valueWei, readProvider, gasLimit } = params;
+
+  let gasPrice = ethers.parseUnits('1', 'gwei');
+  try {
+    const feeData = await readProvider.getFeeData();
+    if (feeData.gasPrice && feeData.gasPrice > 0n) {
+      // Slight 10% priority bump above node floor for fast BSC inclusion
+      gasPrice = (feeData.gasPrice * 110n) / 100n;
+    }
+  } catch {
+    // Keep 1 gwei BSC fallback
+  }
+
+  const baseTx: Record<string, string> = {
+    from,
+    to: ethers.getAddress(to),
+    data,
+    value: ethers.toQuantity(valueWei),
+    gas: ethers.toQuantity(gasLimit),
+  };
+
+  let txHash: string;
+  try {
+    txHash = (await ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{ ...baseTx, gasPrice: ethers.toQuantity(gasPrice) }],
+    })) as string;
+  } catch (err: unknown) {
+    if (isUserRejectedWalletError(err)) {
+      throw new Error('Transaction cancelled in wallet.');
+    }
+    const msg = collectErrorMessages(err).join(' ').toLowerCase();
+    // Some strict EIP-1559 wallet wrappers reject explicit legacy gasPrice — retry without gasPrice
+    if (
+      msg.includes('gasprice') ||
+      msg.includes('maxfeepergas') ||
+      msg.includes('eip-1559') ||
+      msg.includes('invalid')
+    ) {
+      try {
+        txHash = (await ethereum.request({
+          method: 'eth_sendTransaction',
+          params: [baseTx],
+        })) as string;
+      } catch (retryErr: unknown) {
+        throw new Error(formatWalletError(retryErr));
+      }
+    } else {
+      throw new Error(formatWalletError(err));
+    }
+  }
+
+  return {
+    hash: txHash,
+    wait: async () => await readProvider.waitForTransaction(txHash, 1, 90_000),
+  };
+}
+
 export async function approveTokenForRouter(
   ethereum: ethers.Eip1193Provider,
   tokenAddress: string,
@@ -703,11 +875,30 @@ export async function approveTokenForRouter(
   spenderAddress: string = THENA_ROUTER_V2_ADDRESS
 ): Promise<ethers.TransactionReceipt | null> {
   await ensureBscNetwork(ethereum);
-  const browserProvider = new ethers.BrowserProvider(ethereum);
-  const signer = await browserProvider.getSigner();
-  const token = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
-  const tx = (await token.approve(spenderAddress, amountWei)) as ethers.TransactionResponse;
-  return await tx.wait();
+  const from = await getWalletSenderAddress(ethereum);
+  const readProvider = await getBscReadProvider();
+  const iface = new ethers.Interface(ERC20_ABI);
+  const data = iface.encodeFunctionData('approve', [
+    ethers.getAddress(spenderAddress),
+    amountWei,
+  ]);
+  const to = ethers.getAddress(tokenAddress);
+  const gasLimit = await estimateBscGasSafe(
+    readProvider,
+    { from, to, data, value: 0n },
+    85_000n
+  );
+
+  const submitted = await sendWalletTransaction({
+    ethereum,
+    from,
+    to,
+    data,
+    valueWei: 0n,
+    readProvider,
+    gasLimit,
+  });
+  return await submitted.wait();
 }
 
 export async function executeOnChainSwap(params: {
@@ -719,7 +910,7 @@ export async function executeOnChainSwap(params: {
   quote: OnChainQuote;
   deadlineMinutes: number;
   slippagePct?: number;
-}): Promise<ethers.TransactionResponse> {
+}): Promise<SubmittedTx> {
   const {
     ethereum,
     tokenIn,
@@ -732,17 +923,29 @@ export async function executeOnChainSwap(params: {
   } = params;
 
   await ensureBscNetwork(ethereum);
-  const browserProvider = new ethers.BrowserProvider(ethereum);
-  const signer = await browserProvider.getSigner();
-  const userAddress = await signer.getAddress();
+  const userAddress = await getWalletSenderAddress(ethereum);
+  const readProvider = await getBscReadProvider();
 
   if (quote.isWrapOrUnwrap) {
-    const wbnb = new ethers.Contract(WBNB_ADDRESS, WBNB_ABI, signer);
-    if (tokenIn.isNative) {
-      return (await wbnb.deposit({ value: amountInWei })) as ethers.TransactionResponse;
-    } else {
-      return (await wbnb.withdraw(amountInWei)) as ethers.TransactionResponse;
-    }
+    const wbnbIface = new ethers.Interface(WBNB_ABI);
+    const data = tokenIn.isNative
+      ? wbnbIface.encodeFunctionData('deposit')
+      : wbnbIface.encodeFunctionData('withdraw', [amountInWei]);
+    const valueWei = tokenIn.isNative ? amountInWei : 0n;
+    const gasLimit = await estimateBscGasSafe(
+      readProvider,
+      { from: userAddress, to: WBNB_ADDRESS, data, value: valueWei },
+      70_000n
+    );
+    return await sendWalletTransaction({
+      ethereum,
+      from: userAddress,
+      to: WBNB_ADDRESS,
+      data,
+      valueWei,
+      readProvider,
+      gasLimit,
+    });
   }
 
   const deadline = BigInt(Math.floor(Date.now() / 1000) + deadlineMinutes * 60);
@@ -756,30 +959,118 @@ export async function executeOnChainSwap(params: {
         : 50;
     const slippageTolerance = Math.max(5, Math.min(2000, computedBps));
 
-    const buildRes = await fetch(`${KYBER_BSC_API}/route/build`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-client-id': 'TamiSwap',
-      },
-      body: JSON.stringify({
-        routeSummary: quote.kyberRouteSummary,
-        sender: userAddress,
-        recipient: userAddress,
-        slippageTolerance,
-        deadline: Number(deadline),
-      }),
-    });
+    const buildKyberTx = async (summary: KyberRouteSummary, tolBps: number) => {
+      const buildRes = await fetch(`${KYBER_BSC_API}/route/build`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-client-id': 'TamiSwap',
+        },
+        body: JSON.stringify({
+          routeSummary: summary,
+          sender: userAddress,
+          recipient: userAddress,
+          slippageTolerance: tolBps,
+          deadline: Number(deadline),
+        }),
+      });
+      const built = (await buildRes.json()) as KyberBuildResponse;
+      if (!buildRes.ok || built.code !== 0 || !built.data?.data || !built.data?.routerAddress) {
+        throw new Error(built.message || 'Unable to build swap transaction with platform fee.');
+      }
+      return {
+        to: ethers.getAddress(built.data.routerAddress),
+        data: built.data.data,
+        valueWei: tokenIn.isNative ? amountInWei : 0n,
+      };
+    };
 
-    const built = (await buildRes.json()) as KyberBuildResponse;
-    if (!buildRes.ok || built.code !== 0 || !built.data?.data || !built.data?.routerAddress) {
-      throw new Error(built.message || 'Unable to build swap transaction with platform fee.');
+    let txPayload = await buildKyberTx(quote.kyberRouteSummary, slippageTolerance);
+    let gasLimit: bigint;
+    try {
+      gasLimit = await estimateBscGasSafe(
+        readProvider,
+        {
+          from: userAddress,
+          to: txPayload.to,
+          data: txPayload.data,
+          value: txPayload.valueWei,
+        },
+        360_000n
+      );
+    } catch (estErr: unknown) {
+      const errText = collectErrorMessages(estErr).join(' ').toLowerCase();
+      // If price moved slightly since quote, try once with a fresh Kyber route before failing
+      if (
+        errText.includes('return amount is not enough') ||
+        errText.includes('insufficient_output_amount')
+      ) {
+        const fresh = await fetchKyberFeeQuote({
+          tokenIn,
+          tokenOut,
+          amountInWei,
+          mode: 'auto',
+        });
+        if (fresh) {
+          const freshPayload = await buildKyberTx(fresh.routeSummary, slippageTolerance);
+          try {
+            gasLimit = await estimateBscGasSafe(
+              readProvider,
+              {
+                from: userAddress,
+                to: freshPayload.to,
+                data: freshPayload.data,
+                value: freshPayload.valueWei,
+              },
+              360_000n
+            );
+            txPayload = freshPayload;
+          } catch (freshErr: unknown) {
+            // Check if higher slippage resolves a transfer-tax token (e.g. GTAN / WKC)
+            for (const testBps of [300, 600, 1200]) {
+              if (testBps <= slippageTolerance) continue;
+              try {
+                const probePayload = await buildKyberTx(fresh.routeSummary, testBps);
+                await estimateBscGasSafe(
+                  readProvider,
+                  {
+                    from: userAddress,
+                    to: probePayload.to,
+                    data: probePayload.data,
+                    value: probePayload.valueWei,
+                  },
+                  360_000n
+                );
+                throw new Error(
+                  `NEED_SLIPPAGE_${testBps / 100}:This token charges a transfer tax or moved in price — tap "Use ${testBps / 100}% Slippage" or raise Slippage in Settings.`
+                );
+              } catch (probeErr: unknown) {
+                if (
+                  probeErr instanceof Error &&
+                  probeErr.message.startsWith('NEED_SLIPPAGE_')
+                ) {
+                  throw probeErr;
+                }
+              }
+            }
+            throw new Error(formatWalletError(freshErr));
+          }
+        } else {
+          throw new Error(formatWalletError(estErr));
+        }
+      } else {
+        throw new Error(formatWalletError(estErr));
+      }
     }
 
-    return await signer.sendTransaction({
-      to: ethers.getAddress(built.data.routerAddress),
-      data: built.data.data,
-      value: tokenIn.isNative ? amountInWei : 0n,
+    return await sendWalletTransaction({
+      ethereum,
+      from: userAddress,
+      to: txPayload.to,
+      data: txPayload.data,
+      valueWei: txPayload.valueWei,
+      readProvider,
+      gasLimit,
     });
   }
 
@@ -788,61 +1079,80 @@ export async function executeOnChainSwap(params: {
     if (!feeWrapperAddress) {
       throw new Error('TamiSwapFeeRouter contract address is not configured.');
     }
-    const feeWrapper = new ethers.Contract(feeWrapperAddress, TAMI_FEE_ROUTER_ABI, signer);
+    const feeIface = new ethers.Interface(TAMI_FEE_ROUTER_ABI);
+    let data = '';
+    const valueWei = tokenIn.isNative && !tokenOut.isNative ? amountInWei : 0n;
 
     if (quote.dex === 'pancakeswap') {
       if (tokenIn.isNative && !tokenOut.isNative) {
-        return (await feeWrapper.swapExactETHForTokensOnPancake(
+        data = feeIface.encodeFunctionData('swapExactETHForTokensOnPancake', [
           amountOutMinWei,
           quote.pancakePath,
           userAddress,
           deadline,
-          { value: amountInWei }
-        )) as ethers.TransactionResponse;
-      }
-      if (!tokenIn.isNative && tokenOut.isNative) {
-        return (await feeWrapper.swapExactTokensForETHOnPancake(
+        ]);
+      } else if (!tokenIn.isNative && tokenOut.isNative) {
+        data = feeIface.encodeFunctionData('swapExactTokensForETHOnPancake', [
           amountInWei,
           amountOutMinWei,
           quote.pancakePath,
           userAddress,
-          deadline
-        )) as ethers.TransactionResponse;
+          deadline,
+        ]);
+      } else {
+        data = feeIface.encodeFunctionData('swapExactTokensForTokensOnPancake', [
+          amountInWei,
+          amountOutMinWei,
+          quote.pancakePath,
+          userAddress,
+          deadline,
+        ]);
       }
-      return (await feeWrapper.swapExactTokensForTokensOnPancake(
-        amountInWei,
-        amountOutMinWei,
-        quote.pancakePath,
-        userAddress,
-        deadline
-      )) as ethers.TransactionResponse;
-    }
-
-    if (tokenIn.isNative && !tokenOut.isNative) {
-      return (await feeWrapper.swapExactETHForTokensOnThena(
+    } else if (tokenIn.isNative && !tokenOut.isNative) {
+      data = feeIface.encodeFunctionData('swapExactETHForTokensOnThena', [
         amountOutMinWei,
         quote.routes,
         userAddress,
         deadline,
-        { value: amountInWei }
-      )) as ethers.TransactionResponse;
-    }
-    if (!tokenIn.isNative && tokenOut.isNative) {
-      return (await feeWrapper.swapExactTokensForETHOnThena(
+      ]);
+    } else if (!tokenIn.isNative && tokenOut.isNative) {
+      data = feeIface.encodeFunctionData('swapExactTokensForETHOnThena', [
         amountInWei,
         amountOutMinWei,
         quote.routes,
         userAddress,
-        deadline
-      )) as ethers.TransactionResponse;
+        deadline,
+      ]);
+    } else {
+      data = feeIface.encodeFunctionData('swapExactTokensForTokensOnThena', [
+        amountInWei,
+        amountOutMinWei,
+        quote.routes,
+        userAddress,
+        deadline,
+      ]);
     }
-    return (await feeWrapper.swapExactTokensForTokensOnThena(
-      amountInWei,
-      amountOutMinWei,
-      quote.routes,
-      userAddress,
-      deadline
-    )) as ethers.TransactionResponse;
+
+    let gasLimit: bigint;
+    try {
+      gasLimit = await estimateBscGasSafe(
+        readProvider,
+        { from: userAddress, to: feeWrapperAddress, data, value: valueWei },
+        360_000n
+      );
+    } catch (estErr: unknown) {
+      throw new Error(formatWalletError(estErr));
+    }
+
+    return await sendWalletTransaction({
+      ethereum,
+      from: userAddress,
+      to: feeWrapperAddress,
+      data,
+      valueWei,
+      readProvider,
+      gasLimit,
+    });
   }
 
   throw new Error(

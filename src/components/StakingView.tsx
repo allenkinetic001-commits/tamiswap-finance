@@ -24,6 +24,7 @@ import {
   approveTokenForRouter,
   fetchAllowance,
   fetchWalletBalances,
+  formatWalletError,
 } from '../utils/bscWeb3';
 import {
   claimTamiyanoiaReward,
@@ -271,9 +272,7 @@ export function StakingView({
       );
       await loadTamiData();
     } catch (err: unknown) {
-      setTxError(
-        err instanceof Error ? err.message : 'Contract deployment cancelled or failed.'
-      );
+      setTxError(formatWalletError(err));
       setTxStatusText(null);
     } finally {
       setTxPending(null);
@@ -323,7 +322,7 @@ export function StakingView({
       setTxStatusText('TAMIYANOIA approved. Ready for the next step!');
       await refreshTamiAllowance();
     } catch (err: unknown) {
-      setTxError(err instanceof Error ? err.message : 'Approval failed.');
+      setTxError(formatWalletError(err));
       setTxStatusText(null);
     } finally {
       setTxPending(null);
@@ -363,9 +362,7 @@ export function StakingView({
       setTamiAmountStr('');
       await Promise.all([refreshBalances(), refreshTamiAllowance(), loadTamiData()]);
     } catch (err: unknown) {
-      setTxError(
-        err instanceof Error ? err.message : 'TAMIYANOIA staking transaction failed.'
-      );
+      setTxError(formatWalletError(err));
       setTxStatusText(null);
     } finally {
       setTxPending(null);
@@ -386,7 +383,7 @@ export function StakingView({
       setTxStatusText('TAMIYANOIA rewards claimed!');
       await Promise.all([refreshBalances(), loadTamiData()]);
     } catch (err: unknown) {
-      setTxError(err instanceof Error ? err.message : 'Claim failed.');
+      setTxError(formatWalletError(err));
       setTxStatusText(null);
     } finally {
       setTxPending(null);
@@ -425,7 +422,7 @@ export function StakingView({
       setFundAmountStr('');
       await Promise.all([refreshBalances(), refreshTamiAllowance(), loadTamiData()]);
     } catch (err: unknown) {
-      setTxError(err instanceof Error ? err.message : 'Funding rewards failed.');
+      setTxError(formatWalletError(err));
       setTxStatusText(null);
     } finally {
       setTxPending(null);
@@ -450,7 +447,7 @@ export function StakingView({
       setTxStatusText(`Staking fee updated to ${(bps / 100).toFixed(2)}%.`);
       await loadTamiData();
     } catch (err: unknown) {
-      setTxError(err instanceof Error ? err.message : 'Fee update failed.');
+      setTxError(formatWalletError(err));
       setTxStatusText(null);
     } finally {
       setTxPending(null);

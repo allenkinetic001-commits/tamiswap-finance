@@ -25,6 +25,7 @@ import {
   fetchOnChainQuote,
   fetchTokenInfo,
   fetchWalletBalances,
+  formatWalletError,
   OnChainQuote,
 } from '../utils/bscWeb3';
 import { TokenLogo } from './TokenLogo';
@@ -104,6 +105,7 @@ export function SwapWidget({
   const [txHash, setTxHash] = useState<string | null>(null);
   const [txStatusText, setTxStatusText] = useState<string | null>(null);
   const [txError, setTxError] = useState<string | null>(null);
+  const [suggestedSlippagePct, setSuggestedSlippagePct] = useState<number | null>(null);
 
   const tokenIn = useMemo(
     () => tokens.find((t) => t.symbol === tokenInSymbol) || tokens[0],
@@ -324,6 +326,7 @@ export function SwapWidget({
     setTokenOutSymbol(tokenInSymbol);
     setTxHash(null);
     setTxError(null);
+    setSuggestedSlippagePct(null);
     setTxStatusText(null);
   }
 
@@ -340,6 +343,7 @@ export function SwapWidget({
     setImportedCandidate(null);
     setTxHash(null);
     setTxError(null);
+    setSuggestedSlippagePct(null);
     setTxStatusText(null);
   }
 
@@ -374,6 +378,7 @@ export function SwapWidget({
     if (!provider || !walletAddress || amountInWei <= 0n) return;
     setTxPending('approve');
     setTxError(null);
+    setSuggestedSlippagePct(null);
     setTxHash(null);
     setTxStatusText(`Waiting for ${tokenIn.symbol} approval in wallet...`);
     try {
@@ -389,20 +394,25 @@ export function SwapWidget({
       setTxStatusText(`${tokenIn.symbol} approved for ${dexLabel}.`);
       await refreshAllowance();
     } catch (err: unknown) {
-      const msg =
-        (err as { shortMessage?: string; message?: string })?.shortMessage ||
-        (err instanceof Error ? err.message : 'Approval rejected');
-      setTxError(msg);
+      setTxError(formatWalletError(err));
       setTxStatusText(null);
     } finally {
       setTxPending(null);
     }
   }
 
-  async function handleSwap() {
+  async function handleSwap(overrideSlippagePct?: number) {
     if (!provider || !walletAddress || !quote || amountInWei <= 0n) return;
+    const activeSlippage =
+      typeof overrideSlippagePct === 'number' ? overrideSlippagePct : slippagePct;
+    const effectiveMinOut =
+      quote.isWrapOrUnwrap
+        ? quote.amountOutWei
+        : computeMinReceivedWei(quote.amountOutWei, activeSlippage);
+
     setTxPending('swap');
     setTxError(null);
+    setSuggestedSlippagePct(null);
     setTxHash(null);
     setTxStatusText('Confirm swap transaction in your wallet...');
 
@@ -412,10 +422,10 @@ export function SwapWidget({
         tokenIn,
         tokenOut,
         amountInWei,
-        amountOutMinWei: minReceivedWei,
+        amountOutMinWei: effectiveMinOut,
         quote,
         deadlineMinutes: deadlineMin,
-        slippagePct,
+        slippagePct: activeSlippage,
       });
       setTxHash(tx.hash);
       setTxStatusText('Transaction submitted — waiting for BNB Chain confirmation...');
@@ -425,10 +435,15 @@ export function SwapWidget({
       );
       await Promise.all([refreshBalances(), refreshAllowance()]);
     } catch (err: unknown) {
-      const msg =
-        (err as { shortMessage?: string; message?: string })?.shortMessage ||
-        (err instanceof Error ? err.message : 'Swap transaction failed');
-      setTxError(msg);
+      const rawMsg = err instanceof Error ? err.message : '';
+      const slippageMatch = /^NEED_SLIPPAGE_([\d.]+):(.*)$/s.exec(rawMsg);
+      if (slippageMatch) {
+        const neededPct = Number(slippageMatch[1]);
+        setSuggestedSlippagePct(Number.isFinite(neededPct) ? neededPct : 3);
+        setTxError(slippageMatch[2].trim());
+      } else {
+        setTxError(formatWalletError(err));
+      }
       setTxStatusText(null);
     } finally {
       setTxPending(null);
@@ -970,8 +985,22 @@ export function SwapWidget({
           )}
 
           {txError && (
-            <div className="relative z-10 mt-3 border border-red-500/50 bg-red-950/40 px-3.5 py-2 text-xs text-red-200">
-              {txError}
+            <div className="relative z-10 mt-3 space-y-2 border border-red-500/50 bg-red-950/40 px-3.5 py-2.5 text-xs text-red-200">
+              <div>{txError}</div>
+              {suggestedSlippagePct !== null && (
+                <button
+                  type="button"
+                  disabled={txPending !== null}
+                  onClick={() => {
+                    const nextPct = suggestedSlippagePct;
+                    setSlippagePct(nextPct);
+                    void handleSwap(nextPct);
+                  }}
+                  className="combat-steel-btn inline-flex items-center gap-1.5 px-3 py-1.5 font-display text-[10px] font-bold tracking-wider text-white uppercase"
+                >
+                  <span>Use {suggestedSlippagePct}% Slippage &amp; Retry</span>
+                </button>
+              )}
             </div>
           )}
 
@@ -1041,7 +1070,7 @@ export function SwapWidget({
           ) : (
             <button
               type="button"
-              onClick={handleSwap}
+              onClick={() => void handleSwap()}
               disabled={txPending !== null}
               className="combat-energy-btn font-display relative z-10 mt-5 flex w-full items-center justify-center gap-2 px-4 py-3.5 text-xs font-extrabold tracking-widest text-white uppercase drop-shadow-[0_1px_2px_rgba(2,6,23,0.9)] disabled:opacity-60"
             >
