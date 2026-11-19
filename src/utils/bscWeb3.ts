@@ -760,7 +760,9 @@ export interface SubmittedTx {
   wait: () => Promise<ethers.TransactionReceipt | null>;
 }
 
-async function getWalletSenderAddress(ethereum: ethers.Eip1193Provider): Promise<string> {
+export async function getWalletSenderAddress(
+  ethereum: ethers.Eip1193Provider
+): Promise<string> {
   const accounts = (await ethereum.request({ method: 'eth_accounts' })) as string[] | null;
   if (accounts && accounts.length > 0 && ethers.isAddress(accounts[0])) {
     return ethers.getAddress(accounts[0]);
@@ -774,9 +776,9 @@ async function getWalletSenderAddress(ethereum: ethers.Eip1193Provider): Promise
   throw new Error('No wallet account connected.');
 }
 
-async function estimateBscGasSafe(
+export async function estimateBscGasSafe(
   readProvider: ethers.JsonRpcProvider,
-  tx: { from: string; to: string; data: string; value: bigint },
+  tx: { from: string; to?: string; data: string; value: bigint },
   fallbackGas: bigint
 ): Promise<bigint> {
   try {
@@ -801,10 +803,10 @@ async function estimateBscGasSafe(
   }
 }
 
-async function sendWalletTransaction(params: {
+export async function sendWalletTransaction(params: {
   ethereum: ethers.Eip1193Provider;
   from: string;
-  to: string;
+  to?: string;
   data: string;
   valueWei: bigint;
   readProvider: ethers.JsonRpcProvider;
@@ -825,11 +827,13 @@ async function sendWalletTransaction(params: {
 
   const baseTx: Record<string, string> = {
     from,
-    to: ethers.getAddress(to),
     data,
     value: ethers.toQuantity(valueWei),
     gas: ethers.toQuantity(gasLimit),
   };
+  if (to) {
+    baseTx.to = ethers.getAddress(to);
+  }
 
   let txHash: string;
   try {

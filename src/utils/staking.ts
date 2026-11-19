@@ -9,8 +9,12 @@ import {
 } from '../data/swapTokens';
 import {
   ensureBscNetwork,
+  estimateBscGasSafe,
   fetchOnChainQuote,
   getBscReadProvider,
+  getWalletSenderAddress,
+  sendWalletTransaction,
+  SubmittedTx,
 } from './bscWeb3';
 import {
   TAMI_STAKING_BYTECODE,
@@ -340,39 +344,74 @@ export async function fetchTamiStakingState(
   }
 }
 
+async function sendStakingContractTx(
+  ethereum: ethers.Eip1193Provider,
+  contractAddress: string,
+  method: string,
+  args: unknown[],
+  fallbackGas: bigint
+): Promise<SubmittedTx> {
+  await ensureBscNetwork(ethereum);
+  const from = await getWalletSenderAddress(ethereum);
+  const readProvider = await getBscReadProvider();
+  const iface = new ethers.Interface(TAMI_STAKING_ABI);
+  const data = iface.encodeFunctionData(method, args);
+  const to = ethers.getAddress(contractAddress);
+  const gasLimit = await estimateBscGasSafe(
+    readProvider,
+    { from, to, data, value: 0n },
+    fallbackGas
+  );
+  return await sendWalletTransaction({
+    ethereum,
+    from,
+    to,
+    data,
+    valueWei: 0n,
+    readProvider,
+    gasLimit,
+  });
+}
+
 export async function stakeTamiyanoia(
   ethereum: ethers.Eip1193Provider,
   contractAddress: string,
   amountWei: bigint
-): Promise<ethers.TransactionResponse> {
-  await ensureBscNetwork(ethereum);
-  const browserProvider = new ethers.BrowserProvider(ethereum);
-  const signer = await browserProvider.getSigner();
-  const staking = new ethers.Contract(contractAddress, TAMI_STAKING_ABI, signer);
-  return (await staking.stake(amountWei)) as ethers.TransactionResponse;
+): Promise<SubmittedTx> {
+  return await sendStakingContractTx(
+    ethereum,
+    contractAddress,
+    'stake',
+    [amountWei],
+    220_000n
+  );
 }
 
 export async function unstakeTamiyanoia(
   ethereum: ethers.Eip1193Provider,
   contractAddress: string,
   amountWei: bigint
-): Promise<ethers.TransactionResponse> {
-  await ensureBscNetwork(ethereum);
-  const browserProvider = new ethers.BrowserProvider(ethereum);
-  const signer = await browserProvider.getSigner();
-  const staking = new ethers.Contract(contractAddress, TAMI_STAKING_ABI, signer);
-  return (await staking.withdraw(amountWei)) as ethers.TransactionResponse;
+): Promise<SubmittedTx> {
+  return await sendStakingContractTx(
+    ethereum,
+    contractAddress,
+    'withdraw',
+    [amountWei],
+    220_000n
+  );
 }
 
 export async function claimTamiyanoiaReward(
   ethereum: ethers.Eip1193Provider,
   contractAddress: string
-): Promise<ethers.TransactionResponse> {
-  await ensureBscNetwork(ethereum);
-  const browserProvider = new ethers.BrowserProvider(ethereum);
-  const signer = await browserProvider.getSigner();
-  const staking = new ethers.Contract(contractAddress, TAMI_STAKING_ABI, signer);
-  return (await staking.claimReward()) as ethers.TransactionResponse;
+): Promise<SubmittedTx> {
+  return await sendStakingContractTx(
+    ethereum,
+    contractAddress,
+    'claimReward',
+    [],
+    160_000n
+  );
 }
 
 export async function fundTamiyanoiaRewards(
@@ -380,15 +419,14 @@ export async function fundTamiyanoiaRewards(
   contractAddress: string,
   amountWei: bigint,
   durationDays: number
-): Promise<ethers.TransactionResponse> {
-  await ensureBscNetwork(ethereum);
-  const browserProvider = new ethers.BrowserProvider(ethereum);
-  const signer = await browserProvider.getSigner();
-  const staking = new ethers.Contract(contractAddress, TAMI_STAKING_ABI, signer);
-  return (await staking.fundRewards(
-    amountWei,
-    BigInt(durationDays)
-  )) as ethers.TransactionResponse;
+): Promise<SubmittedTx> {
+  return await sendStakingContractTx(
+    ethereum,
+    contractAddress,
+    'fundRewards',
+    [amountWei, BigInt(durationDays)],
+    220_000n
+  );
 }
 
 export async function setTamiyanoiaFeeConfig(
@@ -396,41 +434,53 @@ export async function setTamiyanoiaFeeConfig(
   contractAddress: string,
   stakeFeeBps: number,
   unstakeFeeBps: number
-): Promise<ethers.TransactionResponse> {
-  await ensureBscNetwork(ethereum);
-  const browserProvider = new ethers.BrowserProvider(ethereum);
-  const signer = await browserProvider.getSigner();
-  const staking = new ethers.Contract(contractAddress, TAMI_STAKING_ABI, signer);
-  return (await staking.setFeeConfig(
-    stakeFeeBps,
-    unstakeFeeBps,
-    PLATFORM_FEE_RECIPIENT
-  )) as ethers.TransactionResponse;
+): Promise<SubmittedTx> {
+  return await sendStakingContractTx(
+    ethereum,
+    contractAddress,
+    'setFeeConfig',
+    [stakeFeeBps, unstakeFeeBps, PLATFORM_FEE_RECIPIENT],
+    120_000n
+  );
 }
 
 export async function deployTamiyanoiaStakingContract(
   ethereum: ethers.Eip1193Provider
 ): Promise<{ contractAddress: string; txHash: string }> {
   await ensureBscNetwork(ethereum);
-  const browserProvider = new ethers.BrowserProvider(ethereum);
-  const signer = await browserProvider.getSigner();
-  const signerAddress = await signer.getAddress();
+  const from = await getWalletSenderAddress(ethereum);
+  const readProvider = await getBscReadProvider();
   const factory = new ethers.ContractFactory(
     TAMI_STAKING_COMPILED_ABI,
-    TAMI_STAKING_BYTECODE,
-    signer
+    TAMI_STAKING_BYTECODE
   );
-  const contract = await factory.deploy(
+  const deployTx = await factory.getDeployTransaction(
     TAMIYANOIA_ADDRESS,
     PLATFORM_FEE_RECIPIENT,
-    signerAddress
+    from
   );
-  const deployTx = contract.deploymentTransaction();
-  await contract.waitForDeployment();
-  const contractAddress = await contract.getAddress();
+  const data = deployTx.data || '';
+  const gasLimit = await estimateBscGasSafe(
+    readProvider,
+    { from, data, value: 0n },
+    2_200_000n
+  );
+  const submitted = await sendWalletTransaction({
+    ethereum,
+    from,
+    data,
+    valueWei: 0n,
+    readProvider,
+    gasLimit,
+  });
+  const receipt = await submitted.wait();
+  const contractAddress = receipt?.contractAddress || '';
+  if (!contractAddress || !ethers.isAddress(contractAddress)) {
+    throw new Error('Deployment confirmed, but contract address was not returned by RPC.');
+  }
   return {
     contractAddress: ethers.getAddress(contractAddress),
-    txHash: deployTx?.hash || '',
+    txHash: submitted.hash,
   };
 }
 
