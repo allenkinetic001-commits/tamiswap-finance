@@ -1,14 +1,26 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { ethers } from 'ethers';
 import { AnimatePresence, motion } from 'motion/react';
 import { ArrowLeftRight, BarChart3, Check, Coins, Copy, ExternalLink, Wallet, X } from 'lucide-react';
 import { ExternalTokenSelection, SwapWidget } from './components/SwapWidget';
-import { StakingView } from './components/StakingView';
-import { TopTokensView } from './components/TopTokensView';
 import { BSC_CHAIN_ID } from './data/swapTokens';
 import { ensureBscNetwork, parseChainId } from './utils/bscWeb3';
 import { TAMIYANOIA_TOKEN } from './utils/staking';
-import { TopTokenEntry, toSwapToken } from './utils/topTokens';
+import type { TopTokenEntry } from './utils/topTokens';
+
+const StakingView = lazy(() =>
+  import('./components/StakingView').then((m) => ({ default: m.StakingView }))
+);
+const TopTokensView = lazy(() =>
+  import('./components/TopTokensView').then((m) => ({ default: m.TopTokensView }))
+);
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
+  ]);
+}
 
 interface InjectedProvider extends ethers.Eip1193Provider {
   on?: (event: string, listener: (...args: unknown[]) => void) => void;
@@ -204,34 +216,28 @@ export default function App() {
 
     syncFromMap();
 
-    // Auto-restore already-authorized session if any wallet is already unlocked & permitted
+    // Auto-restore already-authorized session silently without blocking startup
     const candidates = Array.from(map.values());
     if (candidates.length > 0) {
       (async () => {
         for (const candidate of candidates) {
           try {
-            const accs = (await candidate.provider.request({
-              method: 'eth_accounts',
-            })) as string[];
+            const accs = (await withTimeout(
+              candidate.provider.request({ method: 'eth_accounts' }) as Promise<string[]>,
+              2500
+            )) as string[];
             if (accs && accs[0]) {
               setActiveProvider(candidate.provider);
               setWalletAddress(ethers.getAddress(accs[0]));
-              const hex = await candidate.provider.request({
-                method: 'eth_chainId',
-              });
-              let restoredChain = parseChainId(hex);
-              if (restoredChain !== BSC_CHAIN_ID) {
-                try {
-                  await ensureBscNetwork(candidate.provider);
-                  const updatedHex = await candidate.provider.request({
-                    method: 'eth_chainId',
-                  });
-                  restoredChain = parseChainId(updatedHex);
-                } catch {
-                  // Keep restored chain accurate so Switch to BNB Chain button appears
-                }
+              try {
+                const hex = await withTimeout(
+                  candidate.provider.request({ method: 'eth_chainId' }),
+                  2000
+                );
+                setChainId(parseChainId(hex));
+              } catch {
+                // ignore chain read timeout during startup restore
               }
-              setChainId(restoredChain);
               break;
             }
           } catch {
@@ -371,7 +377,14 @@ export default function App() {
 
   function handleSelectTokenForSwap(entry: TopTokenEntry) {
     setSelectedTokenRequest({
-      token: toSwapToken(entry),
+      token: {
+        symbol: entry.symbol,
+        name: entry.name,
+        address: entry.address,
+        decimals: entry.decimals,
+        isNative: entry.isNative,
+        logoURI: entry.logoURI,
+      },
       nonce: Date.now(),
     });
     setActiveTab('swap');
@@ -728,41 +741,33 @@ export default function App() {
               }`}
             />
             <img
-              src="/assets/aistudio/tamiswap_00325eac.png"
+              src={
+                isGreenMode
+                  ? '/assets/aistudio/tamiswap_green.png'
+                  : '/assets/aistudio/tamiswap_00325eac.png'
+              }
               alt="TamiSwap logo"
               width={68}
               height={64}
-              className={`relative z-10 h-13 w-auto sm:h-16 object-contain [image-rendering:-webkit-optimize-contrast] transition-opacity duration-150 ${
-                isGreenMode ? 'opacity-0 pointer-events-none' : 'opacity-100'
-              }`}
-            />
-            <img
-              src="/assets/aistudio/tamiswap_green.png"
-              alt="TamiSwap logo green mode"
-              width={68}
-              height={64}
-              className={`absolute inset-0 m-auto z-10 h-13 w-auto sm:h-16 object-contain drop-shadow-[0_0_10px_rgba(16,185,129,0.55)] [image-rendering:-webkit-optimize-contrast] transition-opacity duration-150 ${
-                isGreenMode ? 'opacity-100' : 'opacity-0 pointer-events-none'
+              className={`relative z-10 h-13 w-auto sm:h-16 object-contain [image-rendering:-webkit-optimize-contrast] ${
+                isGreenMode ? 'drop-shadow-[0_0_10px_rgba(16,185,129,0.55)]' : ''
               }`}
             />
           </div>
           <div className="relative flex items-center shrink min-w-0">
             <img
-              src="/assets/aistudio/tamiswap1_f57f72d8.png"
+              src={
+                isGreenMode
+                  ? '/assets/aistudio/tamiswap1_green.png'
+                  : '/assets/aistudio/tamiswap1_f57f72d8.png'
+              }
               alt="TamiSwap"
               width={180}
               height={60}
-              className={`relative z-10 h-9 w-auto max-w-full sm:h-14 sm:max-w-none object-contain object-left drop-shadow-[0_0_12px_rgba(0,180,255,0.45)] [image-rendering:-webkit-optimize-contrast] transition-opacity duration-150 ${
-                isGreenMode ? 'opacity-0 pointer-events-none' : 'opacity-100'
-              }`}
-            />
-            <img
-              src="/assets/aistudio/tamiswap1_green.png"
-              alt="TamiSwap green mode"
-              width={180}
-              height={60}
-              className={`absolute inset-0 z-10 h-full w-full object-contain object-left drop-shadow-[0_0_12px_rgba(16,185,129,0.5)] [image-rendering:-webkit-optimize-contrast] transition-opacity duration-150 ${
-                isGreenMode ? 'opacity-100' : 'opacity-0 pointer-events-none'
+              className={`relative z-10 h-9 w-auto max-w-full sm:h-14 sm:max-w-none object-contain object-left [image-rendering:-webkit-optimize-contrast] ${
+                isGreenMode
+                  ? 'drop-shadow-[0_0_12px_rgba(16,185,129,0.5)]'
+                  : 'drop-shadow-[0_0_12px_rgba(0,180,255,0.45)]'
               }`}
             />
           </div>
@@ -927,22 +932,38 @@ export default function App() {
         </div>
 
         {activeTab === 'stake' && (
-          <StakingView
-            walletAddress={walletAddress}
-            chainId={chainId}
-            provider={activeProvider}
-            onConnectWallet={handleConnectButton}
-            onSwitchToBsc={handleSwitchToBsc}
-            onBuyTamiyanoia={handleBuyTamiyanoia}
-            isGreenMode={isGreenMode}
-          />
+          <Suspense
+            fallback={
+              <div className="py-10 text-center font-mono text-xs text-slate-400">
+                Loading Staking Vault...
+              </div>
+            }
+          >
+            <StakingView
+              walletAddress={walletAddress}
+              chainId={chainId}
+              provider={activeProvider}
+              onConnectWallet={handleConnectButton}
+              onSwitchToBsc={handleSwitchToBsc}
+              onBuyTamiyanoia={handleBuyTamiyanoia}
+              isGreenMode={isGreenMode}
+            />
+          </Suspense>
         )}
 
         {activeTab === 'top-tokens' && (
-          <TopTokensView
-            onSelectTokenForSwap={handleSelectTokenForSwap}
-            isGreenMode={isGreenMode}
-          />
+          <Suspense
+            fallback={
+              <div className="py-10 text-center font-mono text-xs text-slate-400">
+                Loading Top 10 Tokens...
+              </div>
+            }
+          >
+            <TopTokensView
+              onSelectTokenForSwap={handleSelectTokenForSwap}
+              isGreenMode={isGreenMode}
+            />
+          </Suspense>
         )}
       </main>
 

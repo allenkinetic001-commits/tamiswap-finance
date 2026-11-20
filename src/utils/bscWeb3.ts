@@ -238,28 +238,56 @@ function getConfiguredFeeWrapperAddress(): string | null {
 }
 
 let cachedReadProvider: ethers.JsonRpcProvider | null = null;
+let pendingReadProvider: Promise<ethers.JsonRpcProvider> | null = null;
+
+function firstFulfilled<T>(promises: Promise<T>[]): Promise<T> {
+  return new Promise((resolve, reject) => {
+    let remaining = promises.length;
+    if (remaining === 0) {
+      reject(new Error('No RPC endpoints configured'));
+      return;
+    }
+    for (const p of promises) {
+      p.then(resolve).catch(() => {
+        remaining -= 1;
+        if (remaining === 0) {
+          reject(new Error('All BSC RPC endpoints failed'));
+        }
+      });
+    }
+  });
+}
 
 export async function getBscReadProvider(): Promise<ethers.JsonRpcProvider> {
   if (cachedReadProvider) return cachedReadProvider;
-  for (const url of BSC_RPC_URLS) {
+  if (pendingReadProvider) return pendingReadProvider;
+
+  pendingReadProvider = (async () => {
     try {
-      const provider = new ethers.JsonRpcProvider(url, BSC_CHAIN_ID, {
+      const fastest = await firstFulfilled(
+        BSC_RPC_URLS.map(async (url) => {
+          const provider = new ethers.JsonRpcProvider(url, BSC_CHAIN_ID, {
+            staticNetwork: ethers.Network.from(BSC_CHAIN_ID),
+          });
+          await Promise.race([
+            provider.getBlockNumber(),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000)),
+          ]);
+          return provider;
+        })
+      );
+      cachedReadProvider = fastest;
+      return fastest;
+    } catch {
+      return new ethers.JsonRpcProvider(BSC_RPC_URLS[0], BSC_CHAIN_ID, {
         staticNetwork: ethers.Network.from(BSC_CHAIN_ID),
       });
-      await Promise.race([
-        provider.getBlockNumber(),
-        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 3500)),
-      ]);
-      cachedReadProvider = provider;
-      return provider;
-    } catch {
-      // try next RPC
+    } finally {
+      pendingReadProvider = null;
     }
-  }
-  // Fallback to primary
-  return new ethers.JsonRpcProvider(BSC_RPC_URLS[0], BSC_CHAIN_ID, {
-    staticNetwork: ethers.Network.from(BSC_CHAIN_ID),
-  });
+  })();
+
+  return pendingReadProvider;
 }
 
 export function parseChainId(rawChainId: unknown): number | null {
