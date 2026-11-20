@@ -241,26 +241,25 @@ let cachedReadProvider: ethers.JsonRpcProvider | null = null;
 
 export async function getBscReadProvider(): Promise<ethers.JsonRpcProvider> {
   if (cachedReadProvider) return cachedReadProvider;
-  try {
-    const fastest = await Promise.any(
-      BSC_RPC_URLS.map(async (url) => {
-        const provider = new ethers.JsonRpcProvider(url, BSC_CHAIN_ID, {
-          staticNetwork: ethers.Network.from(BSC_CHAIN_ID),
-        });
-        await Promise.race([
-          provider.getBlockNumber(),
-          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000)),
-        ]);
-        return provider;
-      })
-    );
-    cachedReadProvider = fastest;
-    return fastest;
-  } catch {
-    return new ethers.JsonRpcProvider(BSC_RPC_URLS[0], BSC_CHAIN_ID, {
-      staticNetwork: ethers.Network.from(BSC_CHAIN_ID),
-    });
+  for (const url of BSC_RPC_URLS) {
+    try {
+      const provider = new ethers.JsonRpcProvider(url, BSC_CHAIN_ID, {
+        staticNetwork: ethers.Network.from(BSC_CHAIN_ID),
+      });
+      await Promise.race([
+        provider.getBlockNumber(),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 3500)),
+      ]);
+      cachedReadProvider = provider;
+      return provider;
+    } catch {
+      // try next RPC
+    }
   }
+  // Fallback to primary
+  return new ethers.JsonRpcProvider(BSC_RPC_URLS[0], BSC_CHAIN_ID, {
+    staticNetwork: ethers.Network.from(BSC_CHAIN_ID),
+  });
 }
 
 export function parseChainId(rawChainId: unknown): number | null {
@@ -373,46 +372,36 @@ export async function ensureBscNetwork(ethereum: ethers.Eip1193Provider): Promis
     }
 
     // Many wallets wrap 4902 or throw -32603 / "Unrecognized chain" when BSC isn't added yet
-    try {
-      await ethereum.request({
-        method: 'wallet_addEthereumChain',
-        params: [
-          {
-            chainId: BSC_CHAIN_ID_HEX,
-            chainName: 'BNB Smart Chain',
-            nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
-            rpcUrls: [
-              'https://bsc-dataseed1.binance.org/',
-              'https://bsc-dataseed2.binance.org/',
-              'https://bsc-rpc.publicnode.com/',
-            ],
-            blockExplorerUrls: ['https://bscscan.com/'],
-          },
-        ],
-      });
+    await ethereum.request({
+      method: 'wallet_addEthereumChain',
+      params: [
+        {
+          chainId: BSC_CHAIN_ID_HEX,
+          chainName: 'BNB Smart Chain',
+          nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
+          rpcUrls: [
+            'https://bsc-dataseed1.binance.org/',
+            'https://bsc-dataseed2.binance.org/',
+            'https://bsc-rpc.publicnode.com/',
+          ],
+          blockExplorerUrls: ['https://bscscan.com/'],
+        },
+      ],
+    });
 
-      const afterAddHex = await ethereum.request({ method: 'eth_chainId' });
-      if (parseChainId(afterAddHex) !== BSC_CHAIN_ID) {
-        await ethereum.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: BSC_CHAIN_ID_HEX }],
-        });
-      }
-    } catch (addErr: unknown) {
-      if (isUserRejectedWalletError(addErr)) {
-        throw new Error('Please approve adding BNB Smart Chain (56) in your wallet.');
-      }
-      throw new Error(
-        'Please switch the network to BNB Smart Chain (BSC) in your wallet top bar.'
-      );
+    // Some wallets require an explicit switch call after adding the chain
+    const afterAddHex = await ethereum.request({ method: 'eth_chainId' });
+    if (parseChainId(afterAddHex) !== BSC_CHAIN_ID) {
+      await ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: BSC_CHAIN_ID_HEX }],
+      });
     }
   }
 
   const finalHex = await ethereum.request({ method: 'eth_chainId' });
   if (parseChainId(finalHex) !== BSC_CHAIN_ID) {
-    throw new Error(
-      'Wallet is still not on BNB Smart Chain (Chain ID 56). Please switch to BNB Chain in your wallet.'
-    );
+    throw new Error('Wallet is still not on BNB Smart Chain (Chain ID 56). Please switch to BNB Chain in your wallet.');
   }
 }
 
