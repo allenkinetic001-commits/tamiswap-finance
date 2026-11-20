@@ -49,6 +49,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 interface InjectedProvider extends ethers.Eip1193Provider {
   on?: (event: string, listener: (...args: unknown[]) => void) => void;
   removeListener?: (event: string, listener: (...args: unknown[]) => void) => void;
+  enable?: () => Promise<string[]>;
   isTrust?: boolean;
   isTrustWallet?: boolean;
   isMetaMask?: boolean;
@@ -78,12 +79,17 @@ interface Eip6963AnnounceEvent extends Event {
   };
 }
 
+function isSafePalUserAgent(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /SafePal/i.test(navigator.userAgent || '');
+}
+
 function inferProviderName(p: InjectedProvider): string {
   if (p.isTrust || p.isTrustWallet) return 'Trust Wallet';
   if (p.isRabby) return 'Rabby Wallet';
   if (p.isOkxWallet) return 'OKX Wallet';
   if (p.isCoinbaseWallet) return 'Coinbase Wallet';
-  if (p.isSafePal) return 'SafePal Wallet';
+  if (p.isSafePal || isSafePalUserAgent()) return 'SafePal Wallet';
   if (p.isBitKeep || p.isBitgetWallet) return 'Bitget Wallet';
   if (p.isBinance || p.isBinanceWeb3Wallet) return 'Binance Web3 Wallet';
   if (p.isPhantom) return 'Phantom';
@@ -186,6 +192,7 @@ export default function App() {
       trustwallet?: InjectedProvider;
       okxwallet?: InjectedProvider;
       safepalProvider?: InjectedProvider;
+      safepal?: InjectedProvider & { ethereum?: InjectedProvider };
       binancew3w?: { ethereum?: InjectedProvider };
       bitkeep?: { ethereum?: InjectedProvider };
       phantom?: { ethereum?: InjectedProvider };
@@ -202,6 +209,11 @@ export default function App() {
     }
     if (win.safepalProvider) {
       addCandidate('io.safepal', 'SafePal Wallet', win.safepalProvider);
+    }
+    if (win.safepal?.ethereum) {
+      addCandidate('io.safepal', 'SafePal Wallet', win.safepal.ethereum);
+    } else if (win.safepal && typeof win.safepal.request === 'function') {
+      addCandidate('io.safepal', 'SafePal Wallet', win.safepal);
     }
     if (win.bitkeep?.ethereum) {
       addCandidate('com.bitget.web3', 'Bitget Wallet', win.bitkeep.ethereum);
@@ -223,7 +235,17 @@ export default function App() {
 
     const list = Array.from(map.values());
     setWallets(list);
-    if (detectWalletBrowserUA() || Boolean(win.trustwallet || win.safepalProvider || win.ethereum?.isTrust || win.ethereum?.isTrustWallet)) {
+    if (
+      detectWalletBrowserUA() ||
+      Boolean(
+        win.trustwallet ||
+          win.safepalProvider ||
+          win.safepal ||
+          win.ethereum?.isSafePal ||
+          win.ethereum?.isTrust ||
+          win.ethereum?.isTrustWallet
+      )
+    ) {
       setIsInWalletBrowser(true);
     }
     return list;
@@ -333,36 +355,136 @@ export default function App() {
     };
   }, [activeProvider]);
 
+  async function requestAccountsSafe(provider: InjectedProvider): Promise<string[]> {
+    let raw: unknown;
+    try {
+      raw = await provider.request({ method: 'eth_requestAccounts' });
+    } catch (err: unknown) {
+      if (typeof provider.enable === 'function') {
+        try {
+          raw = await provider.enable();
+        } catch {
+          throw err;
+        }
+      } else {
+        throw err;
+      }
+    }
+    if (Array.isArray(raw)) {
+      const valid = raw.filter((a): a is string => typeof a === 'string' && ethers.isAddress(a));
+      if (valid.length > 0) return valid;
+    }
+    if (
+      raw &&
+      typeof raw === 'object' &&
+      'result' in raw &&
+      Array.isArray((raw as { result?: unknown }).result)
+    ) {
+      const valid = ((raw as { result: unknown[] }).result).filter(
+        (a): a is string => typeof a === 'string' && ethers.isAddress(a)
+      );
+      if (valid.length > 0) return valid;
+    }
+    if (typeof provider.enable === 'function') {
+      const enabled = await provider.enable();
+      if (Array.isArray(enabled)) {
+        const valid = enabled.filter(
+          (a): a is string => typeof a === 'string' && ethers.isAddress(a)
+        );
+        if (valid.length > 0) return valid;
+      }
+    }
+    const existing = await provider.request({ method: 'eth_accounts' });
+    if (Array.isArray(existing)) {
+      const valid = existing.filter(
+        (a): a is string => typeof a === 'string' && ethers.isAddress(a)
+      );
+      if (valid.length > 0) return valid;
+    }
+    return [];
+  }
+
   async function connectWithProvider(chosen: InjectedProvider) {
     setWalletNotice(null);
     setShowWalletModal(false);
     let accountConnected = false;
+    let activeChosen = chosen;
     try {
-      const accounts = (await chosen.request({
-        method: 'eth_requestAccounts',
-      })) as string[];
-      if (accounts && accounts[0] && ethers.isAddress(accounts[0])) {
-        accountConnected = true;
-        setActiveProvider(chosen);
-        setWalletAddress(ethers.getAddress(accounts[0]));
+      const win = window as unknown as {
+        ethereum?: InjectedProvider;
+        safepalProvider?: InjectedProvider;
+        safepal?: InjectedProvider;
+      };
+      const isSafePalChoice =
+        chosen === win.safepalProvider ||
+        chosen === win.safepal ||
+        Boolean(chosen.isSafePal) ||
+        isSafePalUserAgent();
+
+      let accounts: string[] = [];
+      try {
+        accounts = await requestAccountsSafe(activeChosen);
+      } catch (primaryErr: unknown) {
+        const errCode =
+          primaryErr && typeof primaryErr === 'object' && 'code' in primaryErr
+            ? (primaryErr as { code?: unknown }).code
+            : undefined;
+        if (
+          errCode !== 4001 &&
+          isSafePalChoice &&
+          win.ethereum &&
+          win.ethereum !== chosen &&
+          typeof win.ethereum.request === 'function'
+        ) {
+          accounts = await requestAccountsSafe(win.ethereum);
+          if (accounts.length > 0) {
+            activeChosen = win.ethereum;
+          }
+        } else {
+          throw primaryErr;
+        }
       }
+
+      // SafePal mobile/extension fallback: if safepalProvider returned empty, try window.ethereum
+      if (
+        accounts.length === 0 &&
+        isSafePalChoice &&
+        win.ethereum &&
+        win.ethereum !== activeChosen &&
+        typeof win.ethereum.request === 'function'
+      ) {
+        accounts = await requestAccountsSafe(win.ethereum);
+        if (accounts.length > 0) {
+          activeChosen = win.ethereum;
+        }
+      }
+
+      if (accounts.length === 0 || !ethers.isAddress(accounts[0])) {
+        throw new Error(
+          'Wallet did not return an address. Make sure your wallet is unlocked and try again.'
+        );
+      }
+
+      accountConnected = true;
+      setActiveProvider(activeChosen);
+      setWalletAddress(ethers.getAddress(accounts[0]));
 
       // Record initial chainId immediately so it is never stuck null if BSC switch is cancelled
       try {
-        const initialHex = await chosen.request({ method: 'eth_chainId' });
+        const initialHex = await activeChosen.request({ method: 'eth_chainId' });
         setChainId(parseChainId(initialHex));
       } catch {
         // ignore pre-read failure
       }
 
-      await ensureBscNetwork(chosen);
+      await ensureBscNetwork(activeChosen);
 
-      const finalHex = await chosen.request({ method: 'eth_chainId' });
+      const finalHex = await activeChosen.request({ method: 'eth_chainId' });
       const finalChain = parseChainId(finalHex);
       setChainId(finalChain);
     } catch (err: unknown) {
       try {
-        const currentHex = await chosen.request({ method: 'eth_chainId' });
+        const currentHex = await activeChosen.request({ method: 'eth_chainId' });
         const currentChain = parseChainId(currentHex);
         if (currentChain !== null) setChainId(currentChain);
       } catch {
@@ -383,6 +505,15 @@ export default function App() {
     setModalNotice(null);
     window.dispatchEvent(new Event('eip6963:requestProvider'));
     const latest = scanInjectedWallets();
+    if (!walletAddress && isSafePalUserAgent()) {
+      const safePalEntry = latest.find(
+        (w) => w.id === 'safepal-wallet' || w.name.toLowerCase().includes('safepal')
+      );
+      if (safePalEntry) {
+        void connectWithProvider(safePalEntry.provider);
+        return;
+      }
+    }
     if (!walletAddress && isInWalletBrowser && latest.length === 1) {
       void connectWithProvider(latest[0].provider);
       return;
@@ -548,6 +679,7 @@ export default function App() {
           name: 'SafePal Wallet',
           icon: '/assets/wallets/safepal.png',
           iconBg: 'bg-white',
+          nativeHref: `safepalwallet://open_url?url=${encodeURIComponent(launchUrl)}`,
           href: `https://link.safepal.io/open_url?url=${encodeURIComponent(launchUrl)}`,
         },
         {
