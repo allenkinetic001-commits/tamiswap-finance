@@ -84,6 +84,24 @@ function isSafePalUserAgent(): boolean {
   return /SafePal/i.test(navigator.userAgent || '');
 }
 
+function isTrustUserAgent(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /Trust/i.test(navigator.userAgent || '');
+}
+
+function isTrustWalletBrowser(): boolean {
+  if (typeof window === 'undefined') return false;
+  const win = window as unknown as {
+    ethereum?: InjectedProvider;
+    trustwallet?: InjectedProvider & { ethereum?: InjectedProvider };
+  };
+  return (
+    isTrustUserAgent() ||
+    Boolean(win.ethereum?.isTrust || win.ethereum?.isTrustWallet) ||
+    Boolean(win.trustwallet && !win.ethereum?.isMetaMask)
+  );
+}
+
 function inferProviderName(p: InjectedProvider): string {
   if (p.isTrust || p.isTrustWallet) return 'Trust Wallet';
   if (p.isRabby) return 'Rabby Wallet';
@@ -94,6 +112,7 @@ function inferProviderName(p: InjectedProvider): string {
   if (p.isBinance || p.isBinanceWeb3Wallet) return 'Binance Web3 Wallet';
   if (p.isPhantom) return 'Phantom';
   if (p.isMetaMask) return 'MetaMask';
+  if (isTrustUserAgent()) return 'Trust Wallet';
   return 'Browser Web3 Wallet';
 }
 
@@ -189,7 +208,7 @@ export default function App() {
 
     const win = window as unknown as {
       ethereum?: InjectedProvider;
-      trustwallet?: InjectedProvider;
+      trustwallet?: InjectedProvider & { ethereum?: InjectedProvider };
       okxwallet?: InjectedProvider;
       safepalProvider?: InjectedProvider;
       safepal?: InjectedProvider & { ethereum?: InjectedProvider };
@@ -201,7 +220,9 @@ export default function App() {
     if (win.binancew3w?.ethereum) {
       addCandidate('com.binance.wallet', 'Binance Web3 Wallet', win.binancew3w.ethereum);
     }
-    if (win.trustwallet) {
+    if (win.trustwallet?.ethereum) {
+      addCandidate('com.trustwallet.app', 'Trust Wallet', win.trustwallet.ethereum);
+    } else if (win.trustwallet) {
       addCandidate('com.trustwallet.app', 'Trust Wallet', win.trustwallet);
     }
     if (win.okxwallet) {
@@ -412,6 +433,7 @@ export default function App() {
     try {
       const win = window as unknown as {
         ethereum?: InjectedProvider;
+        trustwallet?: InjectedProvider & { ethereum?: InjectedProvider };
         safepalProvider?: InjectedProvider;
         safepal?: InjectedProvider;
       };
@@ -420,6 +442,11 @@ export default function App() {
         chosen === win.safepal ||
         Boolean(chosen.isSafePal) ||
         isSafePalUserAgent();
+      const isTrustChoice =
+        chosen === win.trustwallet ||
+        chosen === win.trustwallet?.ethereum ||
+        Boolean(chosen.isTrust || chosen.isTrustWallet) ||
+        isTrustWalletBrowser();
 
       let accounts: string[] = [];
       try {
@@ -431,7 +458,7 @@ export default function App() {
             : undefined;
         if (
           errCode !== 4001 &&
-          isSafePalChoice &&
+          (isSafePalChoice || isTrustChoice) &&
           win.ethereum &&
           win.ethereum !== chosen &&
           typeof win.ethereum.request === 'function'
@@ -445,10 +472,10 @@ export default function App() {
         }
       }
 
-      // SafePal mobile/extension fallback: if safepalProvider returned empty, try window.ethereum
+      // SafePal / Trust Wallet fallback: if dedicated provider returned empty, try window.ethereum
       if (
         accounts.length === 0 &&
-        isSafePalChoice &&
+        (isSafePalChoice || isTrustChoice) &&
         win.ethereum &&
         win.ethereum !== activeChosen &&
         typeof win.ethereum.request === 'function'
@@ -511,6 +538,15 @@ export default function App() {
       );
       if (safePalEntry) {
         void connectWithProvider(safePalEntry.provider);
+        return;
+      }
+    }
+    if (!walletAddress && isTrustWalletBrowser()) {
+      const trustEntry = latest.find(
+        (w) => w.id === 'trust-wallet' || w.name.toLowerCase().includes('trust')
+      );
+      if (trustEntry) {
+        void connectWithProvider(trustEntry.provider);
         return;
       }
     }
@@ -583,6 +619,14 @@ export default function App() {
       return;
     }
 
+    if (wallet.id === 'trust') {
+      setModalNotice(
+        'Opening Trust Wallet... If your browser asks, tap Open. Link copied as backup — you can also paste it inside Trust Wallet → Browser.'
+      );
+      window.location.href = wallet.href;
+      return;
+    }
+
     setModalNotice(
       `Opening ${wallet.name}... Backup link copied in case your phone asks you to paste it in the wallet Browser.`
     );
@@ -638,10 +682,7 @@ export default function App() {
           name: 'Trust Wallet',
           icon: '/assets/wallets/trustwallet.png',
           iconBg: 'bg-white',
-          nativeHref: `trust://open_url?coin_id=20000714&url=${encodeURIComponent(launchUrl)}`,
-          href: `https://link.trustwallet.com/open_url?coin_id=20000714&url=${encodeURIComponent(
-            launchUrl
-          )}`,
+          href: `trust://open_url?coin_id=20000714&url=${encodeURIComponent(launchUrl)}`,
         },
         {
           id: 'metamask',
