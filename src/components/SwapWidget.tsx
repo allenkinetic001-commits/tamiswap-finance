@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ethers } from 'ethers';
 import { AnimatePresence, motion } from 'motion/react';
 import {
@@ -97,8 +98,10 @@ export function SwapWidget({
   const [quote, setQuote] = useState<OnChainQuote | null>(null);
   const [quoting, setQuoting] = useState(false);
   const [quoteError, setQuoteError] = useState<string | null>(null);
+  const [quoteNonce, setQuoteNonce] = useState(0);
   const [allowanceWei, setAllowanceWei] = useState<bigint>(0n);
   const [checkingAllowance, setCheckingAllowance] = useState(false);
+  const lastAllowanceKeyRef = useRef<string>('');
 
   // Transaction state
   const [txPending, setTxPending] = useState<'approve' | 'swap' | null>(null);
@@ -229,13 +232,13 @@ export function SwapWidget({
       } finally {
         if (!cancelled) setQuoting(false);
       }
-    }, 280);
+    }, 380);
 
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [tokenIn, tokenOut, amountInWei, routeMode, tokenSymbolMap]);
+  }, [tokenIn, tokenOut, amountInWei, routeMode, tokenSymbolMap, quoteNonce]);
 
   // Check ERC-20 allowance when paying with a BEP-20 token
   const refreshAllowance = useCallback(async () => {
@@ -244,16 +247,23 @@ export function SwapWidget({
       tokenIn.isNative ||
       (quote && quote.isWrapOrUnwrap)
     ) {
+      lastAllowanceKeyRef.current = '';
       setAllowanceWei(ethers.MaxUint256);
+      setCheckingAllowance(false);
       return;
     }
-    setCheckingAllowance(true);
+    const spenderAddress = quote?.routerAddress || THENA_ROUTER_V2_ADDRESS;
+    const key = `${walletAddress.toLowerCase()}:${tokenIn.address.toLowerCase()}:${spenderAddress.toLowerCase()}`;
+    const isNewKey = lastAllowanceKeyRef.current !== key;
+    if (isNewKey) {
+      setCheckingAllowance(true);
+    }
     try {
-      const spenderAddress = quote?.routerAddress || THENA_ROUTER_V2_ADDRESS;
       const val = await fetchAllowance(tokenIn.address, walletAddress, spenderAddress);
+      lastAllowanceKeyRef.current = key;
       setAllowanceWei(val);
     } catch {
-      setAllowanceWei(0n);
+      if (isNewKey) setAllowanceWei(0n);
     } finally {
       setCheckingAllowance(false);
     }
@@ -391,8 +401,10 @@ export function SwapWidget({
         spenderAddress
       );
       if (receipt) setTxHash(receipt.hash);
-      setTxStatusText(`${tokenIn.symbol} approved for ${dexLabel}.`);
+      setAllowanceWei((prev) => (prev > amountInWei ? prev : amountInWei));
+      setTxStatusText(`${tokenIn.symbol} approved for ${dexLabel}. Ready to swap.`);
       await refreshAllowance();
+      setQuoteNonce((n) => n + 1);
     } catch (err: unknown) {
       setTxError(formatWalletError(err));
       setTxStatusText(null);
@@ -1125,166 +1137,171 @@ export function SwapWidget({
         </div>
       </div>
 
-      {/* Token Selector Modal + Custom BEP-20 Address Import */}
-      <AnimatePresence>
-        {selectorSide && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.16 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-[#010308]/85 p-4 backdrop-blur-md"
-            onClick={() => setSelectorSide(null)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 8 }}
-              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-              className="armor-chassis-shell w-full max-w-md"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="armor-chassis-rim">
-                <div className="armor-chassis relative p-5">
-                  <div
-                    aria-hidden="true"
-                    className={`pointer-events-none absolute top-0 right-6 left-6 h-[1.5px] bg-gradient-to-r from-transparent to-transparent ${
-                      isGreenMode ? 'via-emerald-400' : 'via-cyan-400'
-                    }`}
-                  />
-                  <div
-                    className={`mb-3.5 flex items-center justify-between border-b pb-3 ${
-                      isGreenMode ? 'border-emerald-400/20' : 'border-sky-400/20'
-                    }`}
+      {/* Token Selector Modal + Custom BEP-20 Address Import (portaled to body so CSS filter on card never traps fixed positioning) */}
+      {typeof document !== 'undefined' &&
+        createPortal(
+          <div className={isGreenMode ? 'theme-green' : ''}>
+            <AnimatePresence>
+              {selectorSide && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.16 }}
+                  className="fixed inset-0 z-50 flex items-center justify-center bg-[#010308]/85 p-4 backdrop-blur-md"
+                  onClick={() => setSelectorSide(null)}
+                >
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.96, y: 8 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.96, y: 8 }}
+                    transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                    className="armor-chassis-shell w-full max-w-md"
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    <h2 className="font-display chrome-text text-sm font-bold tracking-widest uppercase">
-                      Select or Import BEP-20 Token
-                    </h2>
-                    <button
-                      type="button"
-                      onClick={() => setSelectorSide(null)}
-                      className={`combat-steel-btn p-1.5 text-slate-300 ${
-                        isGreenMode ? 'hover:text-emerald-200' : 'hover:text-cyan-200'
-                      }`}
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-
-                  <div className="armor-well-rim mb-3.5">
-                    <input
-                      type="text"
-                      autoFocus
-                      value={tokenSearch}
-                      onChange={(e) => setTokenSearch(e.target.value)}
-                      placeholder="Search symbol or paste 0x BEP-20 contract..."
-                      className="armor-well w-full px-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none"
-                    />
-                  </div>
-
-                  {importingToken && (
-                    <div className="armor-well-rim mb-3">
-                      <div
-                        className={`armor-well flex items-center gap-2 px-3 py-2.5 text-xs ${
-                          isGreenMode ? 'text-emerald-300' : 'text-cyan-300'
-                        }`}
-                      >
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        <span>Looking up BEP-20 contract on BNB Chain...</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {importError && (
-                    <div className="mb-3 border border-red-500/45 bg-red-950/35 px-3 py-2 text-xs text-red-200">
-                      {importError}
-                    </div>
-                  )}
-
-                  {importedCandidate && (
-                    <div
-                      className={`mb-3 flex items-center justify-between border px-3.5 py-2.5 ${
-                        isGreenMode
-                          ? 'border-emerald-400/55 bg-emerald-500/12 shadow-[0_0_16px_rgba(16,185,129,0.2)]'
-                          : 'border-cyan-400/55 bg-sky-500/12 shadow-[0_0_16px_rgba(0,180,255,0.2)]'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <TokenLogo token={importedCandidate} size={30} />
-                        <div>
-                          <div className={`font-mono text-sm font-bold ${isGreenMode ? 'text-emerald-100' : 'text-cyan-100'}`}>
-                            {importedCandidate.symbol}
-                          </div>
-                          <div className="text-xs text-slate-300">
-                            {importedCandidate.name} · {importedCandidate.decimals} decimals
-                          </div>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleImportAndSelect(importedCandidate)}
-                        className="combat-energy-btn inline-flex items-center gap-1 px-3 py-1.5 font-display text-xs font-bold text-white uppercase"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                        <span>Import</span>
-                      </button>
-                    </div>
-                  )}
-
-                  <div
-                    className={`max-h-72 divide-y overflow-y-auto pr-1 ${
-                      isGreenMode ? 'divide-emerald-500/15' : 'divide-sky-500/15'
-                    }`}
-                  >
-                    {filteredTokens.map((t) => {
-                      const isSelected =
-                        (selectorSide === 'in' && t.symbol === tokenInSymbol) ||
-                        (selectorSide === 'out' && t.symbol === tokenOutSymbol);
-                      return (
-                        <button
-                          key={`${t.symbol}-${t.address}`}
-                          type="button"
-                          onClick={() => handleSelectToken(t)}
-                          className={`flex w-full items-center justify-between px-3 py-3 text-left transition-colors ${
-                            isSelected
-                              ? isGreenMode
-                                ? 'bg-emerald-500/16 shadow-[inset_0_0_14px_rgba(16,185,129,0.16)]'
-                                : 'bg-sky-500/16 shadow-[inset_0_0_14px_rgba(0,180,255,0.16)]'
-                              : 'hover:bg-slate-800/55'
+                    <div className="armor-chassis-rim">
+                      <div className="armor-chassis relative p-5">
+                        <div
+                          aria-hidden="true"
+                          className={`pointer-events-none absolute top-0 right-6 left-6 h-[1.5px] bg-gradient-to-r from-transparent to-transparent ${
+                            isGreenMode ? 'via-emerald-400' : 'via-cyan-400'
+                          }`}
+                        />
+                        <div
+                          className={`mb-3.5 flex items-center justify-between border-b pb-3 ${
+                            isGreenMode ? 'border-emerald-400/20' : 'border-sky-400/20'
                           }`}
                         >
-                          <div className="flex items-center gap-3">
-                            <TokenLogo token={t} size={30} />
-                            <div>
-                              <div className="font-mono text-sm font-bold text-slate-100">
-                                {t.symbol}
-                              </div>
-                              <div className="text-xs text-slate-400">
-                                {t.name}
-                                {!t.isNative &&
-                                  ` · ${t.address.slice(0, 6)}...${t.address.slice(-4)}`}
-                              </div>
-                            </div>
-                          </div>
-                          <div
-                            className={`text-right font-mono text-xs font-medium tabular-nums ${
-                              isGreenMode ? 'text-emerald-200' : 'text-cyan-200'
+                          <h2 className="font-display chrome-text text-sm font-bold tracking-widest uppercase">
+                            Select or Import BEP-20 Token
+                          </h2>
+                          <button
+                            type="button"
+                            onClick={() => setSelectorSide(null)}
+                            className={`combat-steel-btn p-1.5 text-slate-300 ${
+                              isGreenMode ? 'hover:text-emerald-200' : 'hover:text-cyan-200'
                             }`}
                           >
-                            {walletAddress
-                              ? formatDisplayAmount(balances[t.symbol] || '0')
-                              : '—'}
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+
+                        <div className="armor-well-rim mb-3.5">
+                          <input
+                            type="text"
+                            value={tokenSearch}
+                            onChange={(e) => setTokenSearch(e.target.value)}
+                            placeholder="Search symbol or paste 0x BEP-20 contract..."
+                            className="armor-well w-full px-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none"
+                          />
+                        </div>
+
+                        {importingToken && (
+                          <div className="armor-well-rim mb-3">
+                            <div
+                              className={`armor-well flex items-center gap-2 px-3 py-2.5 text-xs ${
+                                isGreenMode ? 'text-emerald-300' : 'text-cyan-300'
+                              }`}
+                            >
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              <span>Looking up BEP-20 contract on BNB Chain...</span>
+                            </div>
                           </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
+                        )}
+
+                        {importError && (
+                          <div className="mb-3 border border-red-500/45 bg-red-950/35 px-3 py-2 text-xs text-red-200">
+                            {importError}
+                          </div>
+                        )}
+
+                        {importedCandidate && (
+                          <div
+                            className={`mb-3 flex items-center justify-between border px-3.5 py-2.5 ${
+                              isGreenMode
+                                ? 'border-emerald-400/55 bg-emerald-500/12 shadow-[0_0_16px_rgba(16,185,129,0.2)]'
+                                : 'border-cyan-400/55 bg-sky-500/12 shadow-[0_0_16px_rgba(0,180,255,0.2)]'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <TokenLogo token={importedCandidate} size={30} />
+                              <div>
+                                <div className={`font-mono text-sm font-bold ${isGreenMode ? 'text-emerald-100' : 'text-cyan-100'}`}>
+                                  {importedCandidate.symbol}
+                                </div>
+                                <div className="text-xs text-slate-300">
+                                  {importedCandidate.name} · {importedCandidate.decimals} decimals
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleImportAndSelect(importedCandidate)}
+                              className="combat-energy-btn inline-flex items-center gap-1 px-3 py-1.5 font-display text-xs font-bold text-white uppercase"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                              <span>Import</span>
+                            </button>
+                          </div>
+                        )}
+
+                        <div
+                          className={`max-h-72 divide-y overflow-y-auto pr-1 ${
+                            isGreenMode ? 'divide-emerald-500/15' : 'divide-sky-500/15'
+                          }`}
+                        >
+                          {filteredTokens.map((t) => {
+                            const isSelected =
+                              (selectorSide === 'in' && t.symbol === tokenInSymbol) ||
+                              (selectorSide === 'out' && t.symbol === tokenOutSymbol);
+                            return (
+                              <button
+                                key={`${t.symbol}-${t.address}`}
+                                type="button"
+                                onClick={() => handleSelectToken(t)}
+                                className={`flex w-full items-center justify-between px-3 py-3 text-left transition-colors ${
+                                  isSelected
+                                    ? isGreenMode
+                                      ? 'bg-emerald-500/16 shadow-[inset_0_0_14px_rgba(16,185,129,0.16)]'
+                                      : 'bg-sky-500/16 shadow-[inset_0_0_14px_rgba(0,180,255,0.16)]'
+                                    : 'hover:bg-slate-800/55'
+                                }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <TokenLogo token={t} size={30} />
+                                  <div>
+                                    <div className="font-mono text-sm font-bold text-slate-100">
+                                      {t.symbol}
+                                    </div>
+                                    <div className="text-xs text-slate-400">
+                                      {t.name}
+                                      {!t.isNative &&
+                                        ` · ${t.address.slice(0, 6)}...${t.address.slice(-4)}`}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div
+                                  className={`text-right font-mono text-xs font-medium tabular-nums ${
+                                    isGreenMode ? 'text-emerald-200' : 'text-cyan-200'
+                                  }`}
+                                >
+                                  {walletAddress
+                                    ? formatDisplayAmount(balances[t.symbol] || '0')
+                                    : '—'}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>,
+          document.body
         )}
-      </AnimatePresence>
     </motion.div>
   );
 }

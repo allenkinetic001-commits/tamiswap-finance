@@ -51,6 +51,30 @@ export interface KyberRouteSummary {
   };
 }
 
+export interface ParaSwapPriceRoute {
+  srcToken: string;
+  srcDecimals: number;
+  srcAmount: string;
+  destToken: string;
+  destDecimals: number;
+  destAmount: string;
+  bestRoute: Array<{
+    percent: number;
+    swaps: Array<{
+      swapExchanges: Array<{
+        exchange: string;
+        percent: number;
+      }>;
+    }>;
+  }>;
+  gasCostUSD?: string;
+  contractAddress: string;
+  tokenTransferProxy?: string;
+  network: number;
+  side: 'SELL' | 'BUY';
+  version: string;
+}
+
 export interface OnChainQuote {
   dex: DexId;
   dexLabel: string;
@@ -68,11 +92,17 @@ export interface OnChainQuote {
   pairAddress: string | null;
   isWrapOrUnwrap: boolean;
   useFeeWrapper?: boolean;
+  directRouter?: boolean;
   kyberRouteSummary?: KyberRouteSummary;
+  paraSwapPriceRoute?: ParaSwapPriceRoute;
 }
 
 const KYBER_NATIVE_TOKEN = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 const KYBER_BSC_API = 'https://aggregator-api.kyberswap.com/bsc/api/v1';
+const PARASWAP_API = 'https://apiv5.paraswap.io';
+const BSC_MIN_GAS_PRICE_WEI = ethers.parseUnits('0.15', 'gwei');
+
+let kyberCooldownUntil = 0;
 
 interface KyberRoutesResponse {
   code: number;
@@ -93,22 +123,37 @@ interface KyberBuildResponse {
   };
 }
 
+interface ParaSwapPricesResponse {
+  priceRoute?: ParaSwapPriceRoute;
+  error?: string;
+}
+
+interface ParaSwapTxResponse {
+  to?: string;
+  from?: string;
+  data?: string;
+  value?: string;
+  error?: string;
+}
+
 async function fetchKyberFeeQuote(params: {
   tokenIn: SwapToken;
   tokenOut: SwapToken;
   amountInWei: bigint;
   mode: 'auto' | 'volatile' | 'stable';
 }): Promise<{ routeSummary: KyberRouteSummary; routerAddress: string } | null> {
+  if (Date.now() < kyberCooldownUntil) return null;
+
   const { tokenIn, tokenOut, amountInWei, mode } = params;
   const inAddr = tokenIn.isNative ? KYBER_NATIVE_TOKEN : tokenIn.address;
   const outAddr = tokenOut.isNative ? KYBER_NATIVE_TOKEN : tokenOut.address;
 
   const sourceList =
     mode === 'volatile'
-      ? ['pancake,thena', 'pancake,pancake-v3,thena,thena-fusion']
+      ? ['pancake,thena', '']
       : mode === 'stable'
-      ? ['thena,thena-fusion,pancake-v3,pancake']
-      : ['pancake,pancake-v3,thena,thena-fusion', ''];
+      ? ['thena,thena-fusion,pancake-v3,pancake', '']
+      : [''];
 
   for (const sources of sourceList) {
     try {
@@ -128,6 +173,10 @@ async function fetchKyberFeeQuote(params: {
       const res = await fetch(`${KYBER_BSC_API}/routes?${qs.toString()}`, {
         headers: { 'x-client-id': 'TamiSwap' },
       });
+      if (res.status === 429) {
+        kyberCooldownUntil = Date.now() + 10_000;
+        return null;
+      }
       if (!res.ok) continue;
 
       const json = (await res.json()) as KyberRoutesResponse;
@@ -143,11 +192,82 @@ async function fetchKyberFeeQuote(params: {
         };
       }
     } catch {
-      // try next source filter or direct fallback
+      // try next source filter or fallback aggregator
     }
   }
 
   return null;
+}
+
+async function fetchParaSwapFeeQuote(params: {
+  tokenIn: SwapToken;
+  tokenOut: SwapToken;
+  amountInWei: bigint;
+}): Promise<{ priceRoute: ParaSwapPriceRoute; routerAddress: string; netOutWei: bigint } | null> {
+  const { tokenIn, tokenOut, amountInWei } = params;
+  const srcToken = tokenIn.isNative ? KYBER_NATIVE_TOKEN : tokenIn.address;
+  const destToken = tokenOut.isNative ? KYBER_NATIVE_TOKEN : tokenOut.address;
+
+  try {
+    const qs = new URLSearchParams({
+      srcToken,
+      destToken,
+      amount: amountInWei.toString(),
+      srcDecimals: String(tokenIn.decimals),
+      destDecimals: String(tokenOut.decimals),
+      side: 'SELL',
+      network: String(BSC_CHAIN_ID),
+      version: '6.2',
+      ignoreBadUsdPrice: 'true',
+    });
+    const res = await fetch(`${PARASWAP_API}/prices?${qs.toString()}`);
+    if (!res.ok) return null;
+    const json = (await res.json()) as ParaSwapPricesResponse;
+    const priceRoute = json.priceRoute;
+    if (!priceRoute || !priceRoute.destAmount) return null;
+
+    const grossOut = BigInt(priceRoute.destAmount);
+    if (grossOut <= 0n) return null;
+
+    const netOutWei = (grossOut * BigInt(10000 - PLATFORM_FEE_BPS)) / 10000n;
+    const spender = priceRoute.tokenTransferProxy || priceRoute.contractAddress;
+    if (!spender || !ethers.isAddress(spender)) return null;
+
+    return {
+      priceRoute,
+      routerAddress: ethers.getAddress(spender),
+      netOutWei,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function summarizeParaSwapExchanges(priceRoute: ParaSwapPriceRoute): {
+  dex: DexId;
+  dexLabel: string;
+} {
+  const names = new Set<string>();
+  for (const branch of priceRoute.bestRoute || []) {
+    for (const swap of branch.swaps || []) {
+      for (const ex of swap.swapExchanges || []) {
+        if (ex.exchange) names.add(ex.exchange.toLowerCase());
+      }
+    }
+  }
+  const list = Array.from(names);
+  const hasThena = list.some((e) => e.includes('thena'));
+  const hasPancake = list.some((e) => e.includes('pancake'));
+  if (hasThena && hasPancake) return { dex: 'thena', dexLabel: 'THENA · PancakeSwap' };
+  if (hasThena) return { dex: 'thena', dexLabel: 'THENA' };
+  if (hasPancake) {
+    const isV3 = list.some((e) => e.includes('v3'));
+    return {
+      dex: 'pancakeswap',
+      dexLabel: isV3 ? 'PancakeSwap V3' : 'PancakeSwap V2',
+    };
+  }
+  return { dex: 'pancakeswap', dexLabel: 'BSC Aggregator' };
 }
 
 function summarizeKyberExchanges(route: KyberRouteHop[][]): {
@@ -585,7 +705,7 @@ export async function fetchOnChainQuote(params: {
     | { dex: 'thena'; routes: RouteHop[]; pancakePath: string[]; outWei: bigint }
     | { dex: 'pancakeswap'; routes: RouteHop[]; pancakePath: string[]; outWei: bigint };
 
-  const [thenaResults, pancakeResults, kyberFeeQuote] = await Promise.all([
+  const [thenaResults, pancakeResults, kyberResult] = await Promise.all([
     Promise.all(
       thenaCandidateRoutes.map(async (routes): Promise<QuoteCandidate | null> => {
         try {
@@ -613,10 +733,20 @@ export async function fetchOnChainQuote(params: {
     fetchKyberFeeQuote({ tokenIn, tokenOut, amountInWei, mode }),
   ]);
 
+  let kyberFeeQuote = kyberResult;
+  let paraSwapQuote: Awaited<ReturnType<typeof fetchParaSwapFeeQuote>> = null;
+  if (!kyberFeeQuote) {
+    paraSwapQuote = await fetchParaSwapFeeQuote({ tokenIn, tokenOut, amountInWei });
+    // Retry ParaSwap via Kyber only if ParaSwap also failed and Kyber isn't cooling down
+    if (!paraSwapQuote && Date.now() >= kyberCooldownUntil && mode !== 'auto') {
+      kyberFeeQuote = await fetchKyberFeeQuote({ tokenIn, tokenOut, amountInWei, mode: 'auto' });
+    }
+  }
+
   const valid = [...thenaResults, ...pancakeResults].filter(
     (r): r is QuoteCandidate => r !== null
   );
-  if (valid.length === 0 && !kyberFeeQuote) return null;
+  if (valid.length === 0 && !kyberFeeQuote && !paraSwapQuote) return null;
 
   valid.sort((a, b) => (b.outWei > a.outWei ? 1 : b.outWei < a.outWei ? -1 : 0));
   const best = valid[0];
@@ -694,10 +824,13 @@ export async function fetchOnChainQuote(params: {
   }
 
   const kyberOutWei = kyberFeeQuote ? BigInt(kyberFeeQuote.routeSummary.amountOut) : 0n;
+  const paraOutWei = paraSwapQuote ? paraSwapQuote.netOutWei : 0n;
+  const bestAggOutWei = kyberOutWei >= paraOutWei ? kyberOutWei : paraOutWei;
   const shouldPreferWrapper =
-    Boolean(feeWrapperAddress && best) && (!kyberFeeQuote || (best && best.outWei >= kyberOutWei));
+    Boolean(feeWrapperAddress && best) &&
+    ((!kyberFeeQuote && !paraSwapQuote) || (best && best.outWei >= bestAggOutWei));
 
-  if (kyberFeeQuote && !shouldPreferWrapper) {
+  if (kyberFeeQuote && !shouldPreferWrapper && kyberOutWei >= paraOutWei) {
     const outWei = kyberOutWei;
     const { dex, dexLabel } = summarizeKyberExchanges(kyberFeeQuote.routeSummary.route);
     const primaryBranch = kyberFeeQuote.routeSummary.route[0] || [];
@@ -736,11 +869,55 @@ export async function fetchOnChainQuote(params: {
     };
   }
 
-  if (!feeWrapperAddress || !best) {
-    throw new Error(
-      '0.25% platform fee enforcement active: deploy TamiSwapFeeRouter (VITE_FEE_ROUTER_ADDRESS) to route unindexed BEP-20 tokens directly through THENA/PancakeSwap with your platform fee.'
-    );
+  if (paraSwapQuote && !shouldPreferWrapper) {
+    const { dex, dexLabel } = summarizeParaSwapExchanges(paraSwapQuote.priceRoute);
+    const fallbackSymbols = best
+      ? (() => {
+          const syms = [tokenIn.symbol];
+          if (best.dex === 'thena') {
+            for (let i = 0; i < best.routes.length; i++) {
+              const addr = best.routes[i].to.toLowerCase();
+              syms.push(
+                i === best.routes.length - 1
+                  ? tokenOut.symbol
+                  : tokenSymbolMap[addr] || `${addr.slice(0, 6)}...`
+              );
+            }
+          } else {
+            for (let i = 1; i < best.pancakePath.length; i++) {
+              const addr = best.pancakePath[i].toLowerCase();
+              syms.push(
+                i === best.pancakePath.length - 1
+                  ? tokenOut.symbol
+                  : tokenSymbolMap[addr] || `${addr.slice(0, 6)}...`
+              );
+            }
+          }
+          return syms;
+        })()
+      : [tokenIn.symbol, tokenOut.symbol];
+
+    return {
+      dex,
+      dexLabel,
+      routerAddress: paraSwapQuote.routerAddress,
+      amountOutWei: paraSwapQuote.netOutWei,
+      amountOutFormatted: ethers.formatUnits(paraSwapQuote.netOutWei, tokenOut.decimals),
+      routes: best?.routes || [],
+      pancakePath: best?.pancakePath || [],
+      routeSymbols: fallbackSymbols,
+      priceImpactPct,
+      feeBps,
+      platformFeeBps: PLATFORM_FEE_BPS,
+      platformFeeWei,
+      platformFeeRecipient: PLATFORM_FEE_RECIPIENT,
+      pairAddress,
+      isWrapOrUnwrap: false,
+      paraSwapPriceRoute: paraSwapQuote.priceRoute,
+    };
   }
+
+  if (!best) return null;
 
   const routeSymbols = [tokenIn.symbol];
   if (best.dex === 'thena') {
@@ -763,23 +940,63 @@ export async function fetchOnChainQuote(params: {
     }
   }
 
+  if (feeWrapperAddress) {
+    return {
+      dex: best.dex,
+      dexLabel: best.dex === 'pancakeswap' ? 'PancakeSwap V2' : 'THENA RouterV2',
+      routerAddress: feeWrapperAddress,
+      amountOutWei: best.outWei,
+      amountOutFormatted: ethers.formatUnits(best.outWei, tokenOut.decimals),
+      routes: best.routes,
+      pancakePath: best.pancakePath,
+      routeSymbols,
+      priceImpactPct,
+      feeBps,
+      platformFeeBps: PLATFORM_FEE_BPS,
+      platformFeeWei,
+      platformFeeRecipient: PLATFORM_FEE_RECIPIENT,
+      pairAddress,
+      isWrapOrUnwrap: false,
+      useFeeWrapper: true,
+    };
+  }
+
+  // Fallback for rare unindexed BEP-20 tokens when both aggregators have no route and no fee wrapper is deployed
+  let directOutWei = best.outWei;
+  try {
+    if (best.dex === 'pancakeswap') {
+      const fullAmounts = (await pancakeRouter.getAmountsOut(amountInWei, best.pancakePath)) as bigint[];
+      if (fullAmounts[fullAmounts.length - 1] > 0n) {
+        directOutWei = fullAmounts[fullAmounts.length - 1];
+      }
+    } else {
+      const fullAmounts = (await thenaRouter.getAmountsOut(amountInWei, best.routes)) as bigint[];
+      if (fullAmounts[fullAmounts.length - 1] > 0n) {
+        directOutWei = fullAmounts[fullAmounts.length - 1];
+      }
+    }
+  } catch {
+    // Keep best.outWei
+  }
+
   return {
     dex: best.dex,
     dexLabel: best.dex === 'pancakeswap' ? 'PancakeSwap V2' : 'THENA RouterV2',
-    routerAddress: feeWrapperAddress,
-    amountOutWei: best.outWei,
-    amountOutFormatted: ethers.formatUnits(best.outWei, tokenOut.decimals),
+    routerAddress:
+      best.dex === 'pancakeswap' ? PANCAKE_ROUTER_V2_ADDRESS : THENA_ROUTER_V2_ADDRESS,
+    amountOutWei: directOutWei,
+    amountOutFormatted: ethers.formatUnits(directOutWei, tokenOut.decimals),
     routes: best.routes,
     pancakePath: best.pancakePath,
     routeSymbols,
     priceImpactPct,
     feeBps,
-    platformFeeBps: PLATFORM_FEE_BPS,
-    platformFeeWei,
+    platformFeeBps: 0,
+    platformFeeWei: 0n,
     platformFeeRecipient: PLATFORM_FEE_RECIPIENT,
     pairAddress,
     isWrapOrUnwrap: false,
-    useFeeWrapper: true,
+    directRouter: true,
   };
 }
 
@@ -846,8 +1063,9 @@ export async function sendWalletTransaction(params: {
   try {
     const feeData = await readProvider.getFeeData();
     if (feeData.gasPrice && feeData.gasPrice > 0n) {
-      // Slight 10% priority bump above node floor for fast BSC inclusion
-      gasPrice = (feeData.gasPrice * 110n) / 100n;
+      // Bump slightly above node floor and enforce 0.15 gwei floor so mobile wallet RPCs never reject as underpriced
+      const bumped = (feeData.gasPrice * 115n) / 100n;
+      gasPrice = bumped > BSC_MIN_GAS_PRICE_WEI ? bumped : BSC_MIN_GAS_PRICE_WEI;
     }
   } catch {
     // Keep 1 gwei BSC fallback
@@ -981,46 +1199,93 @@ export async function executeOnChainSwap(params: {
   }
 
   const deadline = BigInt(Math.floor(Date.now() / 1000) + deadlineMinutes * 60);
+  const computedBps =
+    slippagePct !== undefined
+      ? Math.round(slippagePct * 100)
+      : quote.amountOutWei > 0n
+      ? Number(((quote.amountOutWei - amountOutMinWei) * 10000n) / quote.amountOutWei)
+      : 50;
+  const slippageTolerance = Math.max(10, Math.min(2500, computedBps));
 
-  if (quote.kyberRouteSummary) {
-    const computedBps =
-      slippagePct !== undefined
-        ? Math.round(slippagePct * 100)
-        : quote.amountOutWei > 0n
-        ? Number(((quote.amountOutWei - amountOutMinWei) * 10000n) / quote.amountOutWei)
-        : 50;
-    const slippageTolerance = Math.max(5, Math.min(2000, computedBps));
-
-    const buildKyberTx = async (summary: KyberRouteSummary, tolBps: number) => {
-      const buildRes = await fetch(`${KYBER_BSC_API}/route/build`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-client-id': 'TamiSwap',
-        },
-        body: JSON.stringify({
-          routeSummary: summary,
-          sender: userAddress,
-          recipient: userAddress,
-          slippageTolerance: tolBps,
-          deadline: Number(deadline),
-        }),
-      });
-      const built = (await buildRes.json()) as KyberBuildResponse;
-      if (!buildRes.ok || built.code !== 0 || !built.data?.data || !built.data?.routerAddress) {
-        throw new Error(built.message || 'Unable to build swap transaction with platform fee.');
-      }
-      return {
-        to: ethers.getAddress(built.data.routerAddress),
-        data: built.data.data,
-        valueWei: tokenIn.isNative ? amountInWei : 0n,
-      };
+  const buildKyberTx = async (summary: KyberRouteSummary, tolBps: number) => {
+    const buildRes = await fetch(`${KYBER_BSC_API}/route/build`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-client-id': 'TamiSwap',
+      },
+      body: JSON.stringify({
+        routeSummary: summary,
+        sender: userAddress,
+        recipient: userAddress,
+        slippageTolerance: tolBps,
+        deadline: Number(deadline),
+      }),
+    });
+    const built = (await buildRes.json()) as KyberBuildResponse;
+    if (!buildRes.ok || built.code !== 0 || !built.data?.data || !built.data?.routerAddress) {
+      throw new Error(built.message || 'Unable to build swap transaction with platform fee.');
+    }
+    return {
+      to: ethers.getAddress(built.data.routerAddress),
+      data: built.data.data,
+      valueWei: tokenIn.isNative ? amountInWei : 0n,
     };
+  };
 
-    let txPayload = await buildKyberTx(quote.kyberRouteSummary, slippageTolerance);
-    let gasLimit: bigint;
+  const buildParaSwapTx = async (priceRoute: ParaSwapPriceRoute, tolBps: number) => {
+    const srcToken = tokenIn.isNative ? KYBER_NATIVE_TOKEN : tokenIn.address;
+    const destToken = tokenOut.isNative ? KYBER_NATIVE_TOKEN : tokenOut.address;
+    const txRes = await fetch(`${PARASWAP_API}/transactions/${BSC_CHAIN_ID}?ignoreChecks=true`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        srcToken,
+        destToken,
+        srcAmount: amountInWei.toString(),
+        slippage: tolBps,
+        priceRoute,
+        userAddress,
+        partnerAddress: PLATFORM_FEE_RECIPIENT,
+        partnerFeeBps: PLATFORM_FEE_BPS,
+        takeSurplus: false,
+      }),
+    });
+    const txJson = (await txRes.json()) as ParaSwapTxResponse;
+    if (!txRes.ok || !txJson.to || !txJson.data) {
+      throw new Error(txJson.error || 'Unable to build swap transaction.');
+    }
+    return {
+      to: ethers.getAddress(txJson.to),
+      data: txJson.data,
+      valueWei: txJson.value ? BigInt(txJson.value) : tokenIn.isNative ? amountInWei : 0n,
+    };
+  };
+
+  const isRetryableSlippageOrStaleError = (err: unknown): boolean => {
+    const t = collectErrorMessages(err).join(' ').toLowerCase();
+    return (
+      t.includes('return amount is not enough') ||
+      t.includes('insufficient_output_amount') ||
+      t.includes('too little received') ||
+      t.includes('minreturn') ||
+      t.includes('execution reverted') ||
+      t.includes('call_exception') ||
+      t.includes('route') ||
+      t.includes('expired')
+    );
+  };
+
+  if (quote.kyberRouteSummary || quote.paraSwapPriceRoute) {
+    let txPayload: { to: string; data: string; valueWei: bigint } | null = null;
+    let initialErr: unknown = null;
+
     try {
-      gasLimit = await estimateBscGasSafe(
+      txPayload = quote.kyberRouteSummary
+        ? await buildKyberTx(quote.kyberRouteSummary, slippageTolerance)
+        : await buildParaSwapTx(quote.paraSwapPriceRoute!, slippageTolerance);
+
+      const gasLimit = await estimateBscGasSafe(
         readProvider,
         {
           from: userAddress,
@@ -1030,80 +1295,103 @@ export async function executeOnChainSwap(params: {
         },
         360_000n
       );
-    } catch (estErr: unknown) {
-      const errText = collectErrorMessages(estErr).join(' ').toLowerCase();
-      // If price moved slightly since quote, try once with a fresh Kyber route before failing
-      if (
-        errText.includes('return amount is not enough') ||
-        errText.includes('insufficient_output_amount')
-      ) {
-        const fresh = await fetchKyberFeeQuote({
-          tokenIn,
-          tokenOut,
-          amountInWei,
-          mode: 'auto',
+
+      return await sendWalletTransaction({
+        ethereum,
+        from: userAddress,
+        to: txPayload.to,
+        data: txPayload.data,
+        valueWei: txPayload.valueWei,
+        readProvider,
+        gasLimit,
+      });
+    } catch (err: unknown) {
+      initialErr = err;
+    }
+
+    if (isRetryableSlippageOrStaleError(initialErr)) {
+      // 1. Refresh live aggregator route once (KyberSwap or ParaSwap) in case quote aged during approval
+      const freshKyber = quote.kyberRouteSummary
+        ? await fetchKyberFeeQuote({ tokenIn, tokenOut, amountInWei, mode: 'auto' })
+        : null;
+      const freshPara =
+        !freshKyber || freshKyber.routerAddress.toLowerCase() !== quote.routerAddress.toLowerCase()
+          ? await fetchParaSwapFeeQuote({ tokenIn, tokenOut, amountInWei })
+          : null;
+
+      // Only execute directly with another router if input is native BNB OR user already approved that router
+      const candidates: Array<{
+        kind: 'kyber' | 'paraswap';
+        routerAddress: string;
+        build: (tolBps: number) => Promise<{ to: string; data: string; valueWei: bigint }>;
+      }> = [];
+
+      if (freshKyber) {
+        candidates.push({
+          kind: 'kyber',
+          routerAddress: freshKyber.routerAddress,
+          build: (tolBps) => buildKyberTx(freshKyber.routeSummary, tolBps),
         });
-        if (fresh) {
-          const freshPayload = await buildKyberTx(fresh.routeSummary, slippageTolerance);
-          try {
-            gasLimit = await estimateBscGasSafe(
-              readProvider,
-              {
-                from: userAddress,
-                to: freshPayload.to,
-                data: freshPayload.data,
-                value: freshPayload.valueWei,
-              },
-              360_000n
-            );
-            txPayload = freshPayload;
-          } catch (freshErr: unknown) {
-            // Check if higher slippage resolves a transfer-tax token (e.g. GTAN / WKC)
-            for (const testBps of [300, 600, 1200]) {
-              if (testBps <= slippageTolerance) continue;
-              try {
-                const probePayload = await buildKyberTx(fresh.routeSummary, testBps);
-                await estimateBscGasSafe(
-                  readProvider,
-                  {
-                    from: userAddress,
-                    to: probePayload.to,
-                    data: probePayload.data,
-                    value: probePayload.valueWei,
-                  },
-                  360_000n
-                );
-                throw new Error(
-                  `NEED_SLIPPAGE_${testBps / 100}:This token charges a transfer tax or moved in price — tap "Use ${testBps / 100}% Slippage" or raise Slippage in Settings.`
-                );
-              } catch (probeErr: unknown) {
-                if (
-                  probeErr instanceof Error &&
-                  probeErr.message.startsWith('NEED_SLIPPAGE_')
-                ) {
-                  throw probeErr;
-                }
+      }
+      if (freshPara) {
+        candidates.push({
+          kind: 'paraswap',
+          routerAddress: freshPara.routerAddress,
+          build: (tolBps) => buildParaSwapTx(freshPara.priceRoute, tolBps),
+        });
+      }
+
+      const usable = candidates.filter(
+        (c) => tokenIn.isNative || c.routerAddress.toLowerCase() === quote.routerAddress.toLowerCase()
+      );
+
+      for (const cand of usable) {
+        try {
+          const payload = await cand.build(slippageTolerance);
+          const gasLimit = await estimateBscGasSafe(
+            readProvider,
+            { from: userAddress, to: payload.to, data: payload.data, value: payload.valueWei },
+            360_000n
+          );
+          return await sendWalletTransaction({
+            ethereum,
+            from: userAddress,
+            to: payload.to,
+            data: payload.data,
+            valueWei: payload.valueWei,
+            readProvider,
+            gasLimit,
+          });
+        } catch {
+          // Check if higher slippage resolves a transfer-tax token (e.g. GTAN / WKC)
+          for (const testBps of [300, 600, 1200]) {
+            if (testBps <= slippageTolerance) continue;
+            try {
+              const probePayload = await cand.build(testBps);
+              await estimateBscGasSafe(
+                readProvider,
+                {
+                  from: userAddress,
+                  to: probePayload.to,
+                  data: probePayload.data,
+                  value: probePayload.valueWei,
+                },
+                360_000n
+              );
+              throw new Error(
+                `NEED_SLIPPAGE_${testBps / 100}:This token charges a transfer tax or moved in price — tap "Use ${testBps / 100}% Slippage" or raise Slippage in Settings.`
+              );
+            } catch (probeErr: unknown) {
+              if (probeErr instanceof Error && probeErr.message.startsWith('NEED_SLIPPAGE_')) {
+                throw probeErr;
               }
             }
-            throw new Error(formatWalletError(freshErr));
           }
-        } else {
-          throw new Error(formatWalletError(estErr));
         }
-      } else {
-        throw new Error(formatWalletError(estErr));
       }
     }
 
-    return await sendWalletTransaction({
-      ethereum,
-      from: userAddress,
-      to: txPayload.to,
-      data: txPayload.data,
-      valueWei: txPayload.valueWei,
-      readProvider,
-      gasLimit,
-    });
+    throw new Error(formatWalletError(initialErr));
   }
 
   if (quote.useFeeWrapper) {
@@ -1187,7 +1475,89 @@ export async function executeOnChainSwap(params: {
     });
   }
 
+  if (quote.directRouter) {
+    const valueWei = tokenIn.isNative && !tokenOut.isNative ? amountInWei : 0n;
+    const routerAddr =
+      quote.dex === 'pancakeswap' ? PANCAKE_ROUTER_V2_ADDRESS : THENA_ROUTER_V2_ADDRESS;
+    let data = '';
+
+    if (quote.dex === 'pancakeswap') {
+      const pIface = new ethers.Interface(PANCAKE_ROUTER_V2_ABI);
+      if (tokenIn.isNative && !tokenOut.isNative) {
+        data = pIface.encodeFunctionData('swapExactETHForTokensSupportingFeeOnTransferTokens', [
+          amountOutMinWei,
+          quote.pancakePath,
+          userAddress,
+          deadline,
+        ]);
+      } else if (!tokenIn.isNative && tokenOut.isNative) {
+        data = pIface.encodeFunctionData('swapExactTokensForETHSupportingFeeOnTransferTokens', [
+          amountInWei,
+          amountOutMinWei,
+          quote.pancakePath,
+          userAddress,
+          deadline,
+        ]);
+      } else {
+        data = pIface.encodeFunctionData('swapExactTokensForTokensSupportingFeeOnTransferTokens', [
+          amountInWei,
+          amountOutMinWei,
+          quote.pancakePath,
+          userAddress,
+          deadline,
+        ]);
+      }
+    } else {
+      const tIface = new ethers.Interface(ROUTER_V2_ABI);
+      if (tokenIn.isNative && !tokenOut.isNative) {
+        data = tIface.encodeFunctionData('swapExactETHForTokens', [
+          amountOutMinWei,
+          quote.routes,
+          userAddress,
+          deadline,
+        ]);
+      } else if (!tokenIn.isNative && tokenOut.isNative) {
+        data = tIface.encodeFunctionData('swapExactTokensForETH', [
+          amountInWei,
+          amountOutMinWei,
+          quote.routes,
+          userAddress,
+          deadline,
+        ]);
+      } else {
+        data = tIface.encodeFunctionData('swapExactTokensForTokens', [
+          amountInWei,
+          amountOutMinWei,
+          quote.routes,
+          userAddress,
+          deadline,
+        ]);
+      }
+    }
+
+    let gasLimit: bigint;
+    try {
+      gasLimit = await estimateBscGasSafe(
+        readProvider,
+        { from: userAddress, to: routerAddr, data, value: valueWei },
+        360_000n
+      );
+    } catch (estErr: unknown) {
+      throw new Error(formatWalletError(estErr));
+    }
+
+    return await sendWalletTransaction({
+      ethereum,
+      from: userAddress,
+      to: routerAddr,
+      data,
+      valueWei,
+      readProvider,
+      gasLimit,
+    });
+  }
+
   throw new Error(
-    'Platform fee enforcement blocked un-wrapped execution. Refresh your quote to route with the 0.25% fee.'
+    'Unable to prepare swap route. Please refresh your quote and try again.'
   );
 }
