@@ -1,10 +1,10 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { ethers } from 'ethers';
 import { AnimatePresence, motion } from 'motion/react';
 import { ArrowLeftRight, BarChart3, Check, Coins, Copy, ExternalLink, Wallet, X } from 'lucide-react';
 import { ExternalTokenSelection, SwapWidget } from './components/SwapWidget';
 import { BSC_CHAIN_ID } from './data/swapTokens';
-import { ensureBscNetwork, parseChainId } from './utils/bscWeb3';
+import { ensureBscNetwork, formatWalletError, parseChainId } from './utils/bscWeb3';
 import { TAMIYANOIA_TOKEN } from './utils/staking';
 import type { TopTokenEntry } from './utils/topTokens';
 
@@ -15,6 +15,17 @@ const TopTokensView = lazy(() =>
   import('./components/TopTokensView').then((m) => ({ default: m.TopTokensView }))
 );
 
+const PUBLIC_DAPP_URL = 'https://tamiswap-finance.vercel.app';
+
+function resolveDappUrl(): string {
+  if (typeof window === 'undefined') return PUBLIC_DAPP_URL;
+  const host = window.location.hostname.toLowerCase();
+  if (!host || host === 'localhost' || host === '127.0.0.1' || host.endsWith('.run.app')) {
+    return PUBLIC_DAPP_URL;
+  }
+  return `${window.location.origin}${window.location.pathname}${window.location.search}`;
+}
+
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
     promise,
@@ -22,9 +33,20 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   ]);
 }
 
+function isTrustUserAgent(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /Trust/i.test(navigator.userAgent || '');
+}
+
+function isSafePalUserAgent(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /SafePal/i.test(navigator.userAgent || '');
+}
+
 interface InjectedProvider extends ethers.Eip1193Provider {
   on?: (event: string, listener: (...args: unknown[]) => void) => void;
   removeListener?: (event: string, listener: (...args: unknown[]) => void) => void;
+  enable?: () => Promise<string[]>;
   isTrust?: boolean;
   isTrustWallet?: boolean;
   isMetaMask?: boolean;
@@ -59,11 +81,12 @@ function inferProviderName(p: InjectedProvider): string {
   if (p.isRabby) return 'Rabby Wallet';
   if (p.isOkxWallet) return 'OKX Wallet';
   if (p.isCoinbaseWallet) return 'Coinbase Wallet';
-  if (p.isSafePal) return 'SafePal Wallet';
+  if (p.isSafePal || isSafePalUserAgent()) return 'SafePal Wallet';
   if (p.isBitKeep || p.isBitgetWallet) return 'Bitget Wallet';
   if (p.isBinance || p.isBinanceWeb3Wallet) return 'Binance Web3 Wallet';
   if (p.isPhantom) return 'Phantom';
   if (p.isMetaMask) return 'MetaMask';
+  if (isTrustUserAgent()) return 'Trust Wallet';
   return 'Browser Web3 Wallet';
 }
 
@@ -110,6 +133,9 @@ export default function App() {
   const [selectedTokenRequest, setSelectedTokenRequest] =
     useState<ExternalTokenSelection | null>(null);
 
+  const discoveredMapRef = useRef<Map<string, DiscoveredWallet>>(new Map());
+  const restoredAttemptedRef = useRef(false);
+
   useEffect(() => {
     try {
       window.localStorage.removeItem('tamiswap_red_mode');
@@ -119,14 +145,8 @@ export default function App() {
     }
   }, []);
 
-  // Discover EIP-6963 wallets asynchronously + injected browser/mobile wallet globals
-  useEffect(() => {
-    const map = new Map<string, DiscoveredWallet>();
-
-    const syncFromMap = () => {
-      const list = Array.from(map.values());
-      setWallets(list);
-    };
+  const scanInjectedWallets = useCallback((): DiscoveredWallet[] => {
+    const map = discoveredMapRef.current;
 
     function addCandidate(
       id: string,
@@ -157,28 +177,12 @@ export default function App() {
       map.set(canonicalKey, { id: canonicalKey, name: displayName, icon, provider });
     }
 
-    function onAnnounce(event: Event) {
-      const e = event as Eip6963AnnounceEvent;
-      if (e.detail?.provider && e.detail?.info) {
-        addCandidate(
-          e.detail.info.rdns || e.detail.info.uuid,
-          e.detail.info.name,
-          e.detail.provider,
-          e.detail.info.icon,
-          true
-        );
-        syncFromMap();
-      }
-    }
-
-    window.addEventListener('eip6963:announceProvider', onAnnounce);
-    window.dispatchEvent(new Event('eip6963:requestProvider'));
-
     const win = window as unknown as {
       ethereum?: InjectedProvider;
-      trustwallet?: InjectedProvider;
+      trustwallet?: InjectedProvider & { ethereum?: InjectedProvider };
       okxwallet?: InjectedProvider;
       safepalProvider?: InjectedProvider;
+      safepal?: InjectedProvider & { ethereum?: InjectedProvider };
       binancew3w?: { ethereum?: InjectedProvider };
       bitkeep?: { ethereum?: InjectedProvider };
       phantom?: { ethereum?: InjectedProvider };
@@ -187,7 +191,9 @@ export default function App() {
     if (win.binancew3w?.ethereum) {
       addCandidate('com.binance.wallet', 'Binance Web3 Wallet', win.binancew3w.ethereum);
     }
-    if (win.trustwallet) {
+    if (win.trustwallet?.ethereum) {
+      addCandidate('com.trustwallet.app', 'Trust Wallet', win.trustwallet.ethereum);
+    } else if (win.trustwallet) {
       addCandidate('com.trustwallet.app', 'Trust Wallet', win.trustwallet);
     }
     if (win.okxwallet) {
@@ -195,6 +201,11 @@ export default function App() {
     }
     if (win.safepalProvider) {
       addCandidate('io.safepal', 'SafePal Wallet', win.safepalProvider);
+    }
+    if (win.safepal?.ethereum) {
+      addCandidate('io.safepal', 'SafePal Wallet', win.safepal.ethereum);
+    } else if (win.safepal && typeof win.safepal.request === 'function') {
+      addCandidate('io.safepal', 'SafePal Wallet', win.safepal);
     }
     if (win.bitkeep?.ethereum) {
       addCandidate('com.bitget.web3', 'Bitget Wallet', win.bitkeep.ethereum);
@@ -214,43 +225,87 @@ export default function App() {
       }
     }
 
-    syncFromMap();
+    const list = Array.from(map.values());
+    setWallets(list);
+    return list;
+  }, []);
 
-    // Auto-restore already-authorized session silently without blocking startup
-    const candidates = Array.from(map.values());
-    if (candidates.length > 0) {
-      (async () => {
-        for (const candidate of candidates) {
+  const trySilentRestore = useCallback(async (candidates: DiscoveredWallet[]) => {
+    if (restoredAttemptedRef.current || candidates.length === 0) return;
+    restoredAttemptedRef.current = true;
+    for (const candidate of candidates) {
+      try {
+        const accs = (await withTimeout(
+          candidate.provider.request({ method: 'eth_accounts' }) as Promise<string[]>,
+          2500
+        )) as string[];
+        if (accs && accs[0] && ethers.isAddress(accs[0])) {
+          setActiveProvider(candidate.provider);
+          setWalletAddress(ethers.getAddress(accs[0]));
           try {
-            const accs = (await withTimeout(
-              candidate.provider.request({ method: 'eth_accounts' }) as Promise<string[]>,
-              2500
-            )) as string[];
-            if (accs && accs[0]) {
-              setActiveProvider(candidate.provider);
-              setWalletAddress(ethers.getAddress(accs[0]));
-              try {
-                const hex = await withTimeout(
-                  candidate.provider.request({ method: 'eth_chainId' }),
-                  2000
-                );
-                setChainId(parseChainId(hex));
-              } catch {
-                // ignore chain read timeout during startup restore
-              }
-              break;
-            }
+            const hex = await withTimeout(
+              candidate.provider.request({ method: 'eth_chainId' }),
+              2000
+            );
+            setChainId(parseChainId(hex));
           } catch {
-            // ignore silent restore errors
+            // ignore chain read timeout during startup restore
           }
+          break;
         }
-      })();
+      } catch {
+        // ignore silent restore errors
+      }
     }
+  }, []);
+
+  // Discover EIP-6963 wallets asynchronously + injected browser/mobile wallet globals
+  useEffect(() => {
+    const map = discoveredMapRef.current;
+
+    function onAnnounce(event: Event) {
+      const e = event as Eip6963AnnounceEvent;
+      if (e.detail?.provider && e.detail?.info) {
+        const canonicalKey = normalizeWalletKey(
+          e.detail.info.name,
+          e.detail.info.rdns || e.detail.info.uuid
+        );
+        const displayName = canonicalKey === 'trust-wallet' ? 'Trust Wallet' : e.detail.info.name;
+        map.set(canonicalKey, {
+          id: canonicalKey,
+          name: displayName,
+          icon: e.detail.info.icon,
+          provider: e.detail.provider,
+        });
+        const nextList = Array.from(map.values());
+        setWallets(nextList);
+        void trySilentRestore(nextList);
+      }
+    }
+
+    window.addEventListener('eip6963:announceProvider', onAnnounce);
+    window.dispatchEvent(new Event('eip6963:requestProvider'));
+
+    const initial = scanInjectedWallets();
+    void trySilentRestore(initial);
+
+    // Some mobile wallet WebViews (Trust Wallet, SafePal) inject providers shortly after load
+    const t1 = window.setTimeout(() => {
+      window.dispatchEvent(new Event('eip6963:requestProvider'));
+      const rescan1 = scanInjectedWallets();
+      void trySilentRestore(rescan1);
+    }, 300);
+    const t2 = window.setTimeout(() => {
+      const rescan2 = scanInjectedWallets();
+      void trySilentRestore(rescan2);
+    }, 1000);
 
     return () => {
       window.removeEventListener('eip6963:announceProvider', onAnnounce);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
     };
-  }, []);
+  }, [scanInjectedWallets, trySilentRestore]);
 
   // Subscribe to account & chain updates from the connected wallet
   useEffect(() => {
@@ -258,7 +313,9 @@ export default function App() {
 
     function handleAccountsChanged(accs: unknown) {
       const list = accs as string[];
-      setWalletAddress(list && list[0] ? ethers.getAddress(list[0]) : null);
+      setWalletAddress(
+        list && list[0] && ethers.isAddress(list[0]) ? ethers.getAddress(list[0]) : null
+      );
     }
 
     function handleChainChanged(hex: unknown) {
@@ -276,55 +333,167 @@ export default function App() {
     };
   }, [activeProvider]);
 
+  async function requestAccountsSafe(provider: InjectedProvider): Promise<string[]> {
+    let raw: unknown;
+    try {
+      raw = await provider.request({ method: 'eth_requestAccounts' });
+    } catch (err: unknown) {
+      if (typeof provider.enable === 'function') {
+        try {
+          raw = await provider.enable();
+        } catch {
+          throw err;
+        }
+      } else {
+        throw err;
+      }
+    }
+    if (Array.isArray(raw)) {
+      const valid = raw.filter((a): a is string => typeof a === 'string' && ethers.isAddress(a));
+      if (valid.length > 0) return valid;
+    }
+    if (
+      raw &&
+      typeof raw === 'object' &&
+      'result' in raw &&
+      Array.isArray((raw as { result?: unknown }).result)
+    ) {
+      const valid = (raw as { result: unknown[] }).result.filter(
+        (a): a is string => typeof a === 'string' && ethers.isAddress(a)
+      );
+      if (valid.length > 0) return valid;
+    }
+    if (typeof provider.enable === 'function') {
+      const enabled = await provider.enable();
+      if (Array.isArray(enabled)) {
+        const valid = enabled.filter(
+          (a): a is string => typeof a === 'string' && ethers.isAddress(a)
+        );
+        if (valid.length > 0) return valid;
+      }
+    }
+    const existing = await provider.request({ method: 'eth_accounts' });
+    if (Array.isArray(existing)) {
+      const valid = existing.filter(
+        (a): a is string => typeof a === 'string' && ethers.isAddress(a)
+      );
+      if (valid.length > 0) return valid;
+    }
+    return [];
+  }
+
   async function connectWithProvider(chosen: InjectedProvider) {
     setWalletNotice(null);
     setShowWalletModal(false);
+    let activeChosen = chosen;
     try {
-      const accounts = (await chosen.request({
-        method: 'eth_requestAccounts',
-      })) as string[];
-      if (accounts && accounts[0]) {
-        setActiveProvider(chosen);
-        setWalletAddress(ethers.getAddress(accounts[0]));
+      const win = window as unknown as {
+        ethereum?: InjectedProvider;
+        trustwallet?: InjectedProvider & { ethereum?: InjectedProvider };
+        safepalProvider?: InjectedProvider;
+        safepal?: InjectedProvider;
+      };
+      const isTrustChoice =
+        chosen === win.trustwallet ||
+        chosen === win.trustwallet?.ethereum ||
+        Boolean(chosen.isTrust || chosen.isTrustWallet) ||
+        isTrustUserAgent();
+      const isSafePalChoice =
+        chosen === win.safepalProvider ||
+        chosen === win.safepal ||
+        Boolean(chosen.isSafePal) ||
+        isSafePalUserAgent();
+
+      let accounts: string[] = [];
+      try {
+        accounts = await requestAccountsSafe(activeChosen);
+      } catch (primaryErr: unknown) {
+        const errCode =
+          primaryErr && typeof primaryErr === 'object' && 'code' in primaryErr
+            ? (primaryErr as { code?: unknown }).code
+            : undefined;
+        if (
+          errCode !== 4001 &&
+          (isTrustChoice || isSafePalChoice) &&
+          win.ethereum &&
+          win.ethereum !== chosen &&
+          typeof win.ethereum.request === 'function'
+        ) {
+          accounts = await requestAccountsSafe(win.ethereum);
+          if (accounts.length > 0) activeChosen = win.ethereum;
+        } else {
+          throw primaryErr;
+        }
       }
+
+      if (
+        accounts.length === 0 &&
+        (isTrustChoice || isSafePalChoice) &&
+        win.ethereum &&
+        win.ethereum !== activeChosen &&
+        typeof win.ethereum.request === 'function'
+      ) {
+        accounts = await requestAccountsSafe(win.ethereum);
+        if (accounts.length > 0) activeChosen = win.ethereum;
+      }
+
+      if (accounts.length === 0 || !ethers.isAddress(accounts[0])) {
+        throw new Error(
+          'Wallet did not return an address. Make sure your wallet is unlocked and try again.'
+        );
+      }
+
+      setActiveProvider(activeChosen);
+      setWalletAddress(ethers.getAddress(accounts[0]));
 
       // Record initial chainId immediately so it is never stuck null if BSC switch is cancelled
       try {
-        const initialHex = await chosen.request({ method: 'eth_chainId' });
+        const initialHex = await activeChosen.request({ method: 'eth_chainId' });
         setChainId(parseChainId(initialHex));
       } catch {
         // ignore pre-read failure
       }
 
-      await ensureBscNetwork(chosen);
+      await ensureBscNetwork(activeChosen);
 
-      const finalHex = await chosen.request({ method: 'eth_chainId' });
+      const finalHex = await activeChosen.request({ method: 'eth_chainId' });
       const finalChain = parseChainId(finalHex);
       setChainId(finalChain);
     } catch (err: unknown) {
       try {
-        const currentHex = await chosen.request({ method: 'eth_chainId' });
+        const currentHex = await activeChosen.request({ method: 'eth_chainId' });
         const currentChain = parseChainId(currentHex);
         if (currentChain !== null) setChainId(currentChain);
       } catch {
         // ignore read failure
       }
-      const msg =
-        err instanceof Error
-          ? err.message
-          : typeof err === 'object' &&
-            err !== null &&
-            'message' in err &&
-            typeof (err as { message?: unknown }).message === 'string'
-          ? (err as { message: string }).message
-          : 'Wallet connection was rejected.';
-      setWalletNotice(msg);
+      setWalletNotice(formatWalletError(err));
     }
   }
 
   function handleConnectButton() {
     setWalletNotice(null);
     setModalNotice(null);
+    window.dispatchEvent(new Event('eip6963:requestProvider'));
+    const latest = scanInjectedWallets();
+    if (!walletAddress && (isTrustUserAgent() || (latest.length === 1 && latest[0].id === 'trust-wallet'))) {
+      const trustEntry = latest.find(
+        (w) => w.id === 'trust-wallet' || w.name.toLowerCase().includes('trust')
+      );
+      if (trustEntry) {
+        void connectWithProvider(trustEntry.provider);
+        return;
+      }
+    }
+    if (!walletAddress && (isSafePalUserAgent() || (latest.length === 1 && latest[0].id === 'safepal-wallet'))) {
+      const safePalEntry = latest.find(
+        (w) => w.id === 'safepal-wallet' || w.name.toLowerCase().includes('safepal')
+      );
+      if (safePalEntry) {
+        void connectWithProvider(safePalEntry.provider);
+        return;
+      }
+    }
     setShowWalletModal(true);
   }
 
@@ -352,7 +521,7 @@ export default function App() {
   async function handleCopySiteUrl() {
     if (typeof window === 'undefined') return;
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      await navigator.clipboard.writeText(resolveDappUrl());
       setCopiedUrl(true);
       setTimeout(() => setCopiedUrl(false), 2000);
     } catch {
@@ -360,18 +529,42 @@ export default function App() {
     }
   }
 
-  function handleBinanceWalletClick(e: React.MouseEvent<HTMLAnchorElement>) {
-    const detectedBinance = wallets.find((w) =>
-      w.name.toLowerCase().includes('binance')
-    );
-    if (detectedBinance) {
+  function handleMobileWalletClick(
+    e: React.MouseEvent<HTMLAnchorElement>,
+    wallet: { id: string; name: string; href: string }
+  ) {
+    const matchedInjected = wallets.find((w) => {
+      const n = w.name.toLowerCase();
+      if (wallet.id === 'trust') return n.includes('trust');
+      if (wallet.id === 'metamask') return n.includes('metamask');
+      if (wallet.id === 'binance') return n.includes('binance');
+      if (wallet.id === 'okx') return n.includes('okx');
+      if (wallet.id === 'coinbase') return n.includes('coinbase');
+      if (wallet.id === 'safepal') return n.includes('safepal');
+      if (wallet.id === 'bitget') return n.includes('bitget');
+      return false;
+    });
+    if (matchedInjected) {
       e.preventDefault();
-      connectWithProvider(detectedBinance.provider);
+      void connectWithProvider(matchedInjected.provider);
       return;
     }
-    handleCopySiteUrl();
+
+    void handleCopySiteUrl();
+    if (wallet.id === 'binance') {
+      setModalNotice(
+        'DApp URL copied! Opening Binance App — go to Wallets → Web3 → Discover and paste the URL.'
+      );
+      return;
+    }
+    if (wallet.id === 'trust') {
+      setModalNotice(
+        'Opening Trust Wallet... Link copied as backup — if your browser does not switch automatically, open Trust Wallet → Browser and paste the link.'
+      );
+      return;
+    }
     setModalNotice(
-      'DApp URL copied! Opening Binance App — go to Wallets → Web3 → Discover and paste the URL.'
+      `Opening ${wallet.name}... Backup link copied in case your browser asks you to paste it in the wallet Browser.`
     );
   }
 
@@ -405,34 +598,32 @@ export default function App() {
   }
 
   const wrongNetwork = Boolean(walletAddress) && chainId !== null && chainId !== BSC_CHAIN_ID;
-  const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
-  const dappHostPath =
-    typeof window !== 'undefined'
-      ? `${window.location.host}${window.location.pathname}${window.location.search}`
-      : '';
-  const mobileWalletLinks = currentUrl
+  const launchUrl = resolveDappUrl();
+  const launchHostPath = launchUrl.replace(/^https?:\/\//i, '');
+  const mobileWalletLinks = launchUrl
     ? [
-        {
-          id: 'metamask',
-          name: 'MetaMask',
-          icon: '/assets/wallets/metamask.png',
-          iconBg: 'bg-white',
-          href: `https://metamask.app.link/dapp/${dappHostPath}`,
-        },
         {
           id: 'trust',
           name: 'Trust Wallet',
           icon: '/assets/wallets/trustwallet.png',
           iconBg: 'bg-white',
-          href: `https://link.trustwallet.com/open_url?coin_id=20000714&url=${encodeURIComponent(
-            currentUrl
-          )}`,
+          isCustomScheme: true,
+          href: `trust://open_url?coin_id=20000714&url=${encodeURIComponent(launchUrl)}`,
+        },
+        {
+          id: 'metamask',
+          name: 'MetaMask',
+          icon: '/assets/wallets/metamask.png',
+          iconBg: 'bg-white',
+          isCustomScheme: false,
+          href: `https://metamask.app.link/dapp/${launchHostPath}`,
         },
         {
           id: 'binance',
           name: 'Binance Wallet',
           icon: '/assets/wallets/binance.png',
           iconBg: 'bg-[#0B1222]',
+          isCustomScheme: true,
           href: 'bnc://app.binance.com/web3',
         },
         {
@@ -440,8 +631,9 @@ export default function App() {
           name: 'OKX Wallet',
           icon: '/assets/wallets/okx.png',
           iconBg: 'bg-black',
+          isCustomScheme: false,
           href: `https://www.okx.com/download?deeplink=${encodeURIComponent(
-            `okx://wallet/dapp/url?dappUrl=${encodeURIComponent(currentUrl)}`
+            `okx://wallet/dapp/url?dappUrl=${encodeURIComponent(launchUrl)}`
           )}`,
         },
         {
@@ -449,21 +641,24 @@ export default function App() {
           name: 'Coinbase Wallet',
           icon: '/assets/wallets/coinbase.png',
           iconBg: 'bg-white',
-          href: `https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(currentUrl)}`,
+          isCustomScheme: false,
+          href: `https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(launchUrl)}`,
         },
         {
           id: 'safepal',
           name: 'SafePal Wallet',
           icon: '/assets/wallets/safepal.png',
           iconBg: 'bg-white',
-          href: `https://link.safepal.io/open_url?url=${encodeURIComponent(currentUrl)}`,
+          isCustomScheme: false,
+          href: `https://link.safepal.io/open_url?url=${encodeURIComponent(launchUrl)}`,
         },
         {
           id: 'bitget',
           name: 'Bitget Wallet',
           icon: '/assets/wallets/bitget.png',
           iconBg: 'bg-[#0B1222]',
-          href: `https://bkcode.vip?action=dapp&url=${encodeURIComponent(currentUrl)}`,
+          isCustomScheme: false,
+          href: `https://bkcode.vip?action=dapp&url=${encodeURIComponent(launchUrl)}`,
         },
       ]
     : [];
@@ -1117,13 +1312,9 @@ export default function App() {
                             <a
                               key={wallet.id}
                               href={wallet.href}
-                              target={wallet.id === 'binance' ? undefined : '_blank'}
-                              rel={wallet.id === 'binance' ? undefined : 'noopener noreferrer'}
-                              onClick={
-                                wallet.id === 'binance'
-                                  ? handleBinanceWalletClick
-                                  : undefined
-                              }
+                              target={wallet.isCustomScheme ? undefined : '_blank'}
+                              rel={wallet.isCustomScheme ? undefined : 'noopener noreferrer'}
+                              onClick={(e) => handleMobileWalletClick(e, wallet)}
                               className="combat-steel-btn flex items-center justify-between gap-1.5 px-2.5 py-2.5 text-xs font-semibold text-slate-100"
                             >
                               <span className="flex min-w-0 items-center gap-2">
