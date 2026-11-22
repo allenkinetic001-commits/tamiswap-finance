@@ -43,6 +43,24 @@ function isSafePalUserAgent(): boolean {
   return /SafePal/i.test(navigator.userAgent || '');
 }
 
+function getMobileEnvironment(): {
+  isAndroid: boolean;
+  isIOS: boolean;
+  isEmbeddedWebView: boolean;
+} {
+  if (typeof navigator === 'undefined') {
+    return { isAndroid: false, isIOS: false, isEmbeddedWebView: false };
+  }
+  const ua = navigator.userAgent || '';
+  const isAndroid = /Android/i.test(ua);
+  const isIOS = /iPhone|iPad|iPod/i.test(ua);
+  const isEmbeddedWebView =
+    /; wv\)/i.test(ua) ||
+    /\b(FBAN|FBAV|Instagram|Line|MicroMessenger|Telegram|Twitter|GSA\/)\b/i.test(ua) ||
+    (isIOS && !/Safari/i.test(ua));
+  return { isAndroid, isIOS, isEmbeddedWebView };
+}
+
 interface InjectedProvider extends ethers.Eip1193Provider {
   on?: (event: string, listener: (...args: unknown[]) => void) => void;
   removeListener?: (event: string, listener: (...args: unknown[]) => void) => void;
@@ -531,7 +549,7 @@ export default function App() {
 
   function handleMobileWalletClick(
     e: React.MouseEvent<HTMLAnchorElement>,
-    wallet: { id: string; name: string; href: string }
+    wallet: { id: string; name: string; href: string; isCustomScheme?: boolean }
   ) {
     const matchedInjected = wallets.find((w) => {
       const n = w.name.toLowerCase();
@@ -551,6 +569,19 @@ export default function App() {
     }
 
     void handleCopySiteUrl();
+
+    const { isAndroid, isIOS, isEmbeddedWebView } = getMobileEnvironment();
+    const isDesktop = !isAndroid && !isIOS;
+    // Never navigate to trust:// or bnc:// directly from Desktop or an embedded WebView
+    // where Chromium/WebView replaces the page with "Webpage not available (ERR_UNKNOWN_URL_SCHEME)".
+    if (wallet.isCustomScheme && (isDesktop || isEmbeddedWebView)) {
+      e.preventDefault();
+      setModalNotice(
+        `DApp link copied! Open ${wallet.name} → Browser and paste this link to trade: ${launchUrl}`
+      );
+      return;
+    }
+
     if (wallet.id === 'binance') {
       setModalNotice(
         'DApp URL copied! Opening Binance App — go to Wallets → Web3 → Discover and paste the URL.'
@@ -600,6 +631,19 @@ export default function App() {
   const wrongNetwork = Boolean(walletAddress) && chainId !== null && chainId !== BSC_CHAIN_ID;
   const launchUrl = resolveDappUrl();
   const launchHostPath = launchUrl.replace(/^https?:\/\//i, '');
+  const { isAndroid } = getMobileEnvironment();
+  const trustDeepLink = isAndroid
+    ? `intent://open_url?coin_id=20000714&url=${encodeURIComponent(
+        launchUrl
+      )}#Intent;scheme=trust;package=com.wallet.crypto.trustapp;S.browser_fallback_url=${encodeURIComponent(
+        launchUrl
+      )};end`
+    : `trust://open_url?coin_id=20000714&url=${encodeURIComponent(launchUrl)}`;
+  const binanceDeepLink = isAndroid
+    ? `intent://app.binance.com/web3#Intent;scheme=bnc;package=com.binance.dev;S.browser_fallback_url=${encodeURIComponent(
+        launchUrl
+      )};end`
+    : 'bnc://app.binance.com/web3';
   const mobileWalletLinks = launchUrl
     ? [
         {
@@ -608,7 +652,7 @@ export default function App() {
           icon: '/assets/wallets/trustwallet.png',
           iconBg: 'bg-white',
           isCustomScheme: true,
-          href: `trust://open_url?coin_id=20000714&url=${encodeURIComponent(launchUrl)}`,
+          href: trustDeepLink,
         },
         {
           id: 'metamask',
@@ -624,7 +668,7 @@ export default function App() {
           icon: '/assets/wallets/binance.png',
           iconBg: 'bg-[#0B1222]',
           isCustomScheme: true,
-          href: 'bnc://app.binance.com/web3',
+          href: binanceDeepLink,
         },
         {
           id: 'okx',

@@ -1081,12 +1081,12 @@ export async function sendWalletTransaction(params: {
     baseTx.to = ethers.getAddress(to);
   }
 
-  let txHash: string;
+  let rawHash: unknown;
   try {
-    txHash = (await ethereum.request({
+    rawHash = await ethereum.request({
       method: 'eth_sendTransaction',
       params: [{ ...baseTx, gasPrice: ethers.toQuantity(gasPrice) }],
-    })) as string;
+    });
   } catch (err: unknown) {
     if (isUserRejectedWalletError(err)) {
       throw new Error('Transaction cancelled in wallet.');
@@ -1100,10 +1100,10 @@ export async function sendWalletTransaction(params: {
       msg.includes('invalid')
     ) {
       try {
-        txHash = (await ethereum.request({
+        rawHash = await ethereum.request({
           method: 'eth_sendTransaction',
           params: [baseTx],
-        })) as string;
+        });
       } catch (retryErr: unknown) {
         throw new Error(formatWalletError(retryErr));
       }
@@ -1111,6 +1111,15 @@ export async function sendWalletTransaction(params: {
       throw new Error(formatWalletError(err));
     }
   }
+
+  const txHash =
+    typeof rawHash === 'string'
+      ? rawHash
+      : rawHash && typeof rawHash === 'object' && 'hash' in rawHash && typeof (rawHash as { hash?: unknown }).hash === 'string'
+      ? (rawHash as { hash: string }).hash
+      : rawHash && typeof rawHash === 'object' && 'result' in rawHash && typeof (rawHash as { result?: unknown }).result === 'string'
+      ? (rawHash as { result: string }).result
+      : String(rawHash || '');
 
   return {
     hash: txHash,
