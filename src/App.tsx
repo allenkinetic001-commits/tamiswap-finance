@@ -46,19 +46,54 @@ function isSafePalUserAgent(): boolean {
 function getMobileEnvironment(): {
   isAndroid: boolean;
   isIOS: boolean;
+  isAndroidFirefox: boolean;
   isEmbeddedWebView: boolean;
+  isInIframe: boolean;
 } {
   if (typeof navigator === 'undefined') {
-    return { isAndroid: false, isIOS: false, isEmbeddedWebView: false };
+    return {
+      isAndroid: false,
+      isIOS: false,
+      isAndroidFirefox: false,
+      isEmbeddedWebView: false,
+      isInIframe: false,
+    };
   }
   const ua = navigator.userAgent || '';
   const isAndroid = /Android/i.test(ua);
   const isIOS = /iPhone|iPad|iPod/i.test(ua);
+  const isAndroidFirefox = isAndroid && /Firefox|FxiOS/i.test(ua);
   const isEmbeddedWebView =
     /; wv\)/i.test(ua) ||
     /\b(FBAN|FBAV|Instagram|Line|MicroMessenger|Telegram|Twitter|GSA\/)\b/i.test(ua) ||
     (isIOS && !/Safari/i.test(ua));
-  return { isAndroid, isIOS, isEmbeddedWebView };
+  let isInIframe = false;
+  try {
+    isInIframe = typeof window !== 'undefined' && window.self !== window.top;
+  } catch {
+    isInIframe = true;
+  }
+  return { isAndroid, isIOS, isAndroidFirefox, isEmbeddedWebView, isInIframe };
+}
+
+function triggerHiddenSchemeAttempt(schemeUrl: string) {
+  if (typeof document === 'undefined') return;
+  try {
+    const frame = document.createElement('iframe');
+    frame.style.display = 'none';
+    frame.setAttribute('aria-hidden', 'true');
+    frame.src = schemeUrl;
+    document.body.appendChild(frame);
+    window.setTimeout(() => {
+      try {
+        frame.remove();
+      } catch {
+        // ignore cleanup error
+      }
+    }, 1800);
+  } catch {
+    // ignore WebView iframe restrictions
+  }
 }
 
 interface InjectedProvider extends ethers.Eip1193Provider {
@@ -317,11 +352,26 @@ export default function App() {
       const rescan2 = scanInjectedWallets();
       void trySilentRestore(rescan2);
     }, 1000);
+    const t3 = window.setTimeout(() => {
+      const rescan3 = scanInjectedWallets();
+      void trySilentRestore(rescan3);
+    }, 2200);
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        window.dispatchEvent(new Event('eip6963:requestProvider'));
+        const rescan = scanInjectedWallets();
+        void trySilentRestore(rescan);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
       window.removeEventListener('eip6963:announceProvider', onAnnounce);
       window.clearTimeout(t1);
       window.clearTimeout(t2);
+      window.clearTimeout(t3);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [scanInjectedWallets, trySilentRestore]);
 
@@ -494,6 +544,9 @@ export default function App() {
     setModalNotice(null);
     window.dispatchEvent(new Event('eip6963:requestProvider'));
     const latest = scanInjectedWallets();
+    const { isAndroid: mobileAndroid, isIOS: mobileIOS } = getMobileEnvironment();
+    const isMobileDevice = mobileAndroid || mobileIOS;
+
     if (!walletAddress && (isTrustUserAgent() || (latest.length === 1 && latest[0].id === 'trust-wallet'))) {
       const trustEntry = latest.find(
         (w) => w.id === 'trust-wallet' || w.name.toLowerCase().includes('trust')
@@ -511,6 +564,11 @@ export default function App() {
         void connectWithProvider(safePalEntry.provider);
         return;
       }
+    }
+    // On mobile, having an injected EIP-1193 provider means we are already inside a wallet's DApp browser
+    if (!walletAddress && isMobileDevice && latest.length === 1) {
+      void connectWithProvider(latest[0].provider);
+      return;
     }
     setShowWalletModal(true);
   }
@@ -549,8 +607,17 @@ export default function App() {
 
   function handleMobileWalletClick(
     e: React.MouseEvent<HTMLAnchorElement>,
-    wallet: { id: string; name: string; href: string; isCustomScheme?: boolean }
+    wallet: {
+      id: string;
+      name: string;
+      href: string;
+      customSchemeHref?: string;
+      isCustomScheme?: boolean;
+    }
   ) {
+    const { isAndroid: mobileAndroid, isIOS: mobileIOS, isEmbeddedWebView } = getMobileEnvironment();
+    const isMobileDevice = mobileAndroid || mobileIOS;
+
     const matchedInjected = wallets.find((w) => {
       const n = w.name.toLowerCase();
       if (wallet.id === 'trust') return n.includes('trust');
@@ -567,35 +634,59 @@ export default function App() {
       void connectWithProvider(matchedInjected.provider);
       return;
     }
+    // If the user is already inside a mobile wallet DApp browser whose injected provider masked its name,
+    // connect with that active wallet provider instead of leaving the browser via an external deep link.
+    if (isMobileDevice && wallets.length >= 1) {
+      e.preventDefault();
+      void connectWithProvider(wallets[0].provider);
+      return;
+    }
 
     void handleCopySiteUrl();
 
-    const { isAndroid, isIOS, isEmbeddedWebView } = getMobileEnvironment();
-    const isDesktop = !isAndroid && !isIOS;
-    // Never navigate to trust:// or bnc:// directly from Desktop or an embedded WebView
-    // where Chromium/WebView replaces the page with "Webpage not available (ERR_UNKNOWN_URL_SCHEME)".
-    if (wallet.isCustomScheme && (isDesktop || isEmbeddedWebView)) {
+    const isDesktop = !mobileAndroid && !mobileIOS;
+    if (wallet.isCustomScheme && isDesktop) {
       e.preventDefault();
       setModalNotice(
-        `DApp link copied! Open ${wallet.name} → Browser and paste this link to trade: ${launchUrl}`
+        `Link copied! On your phone, open ${wallet.name} → Browser and paste: ${launchUrl}`
+      );
+      return;
+    }
+
+    // In embedded WebViews (Google App, Telegram, Facebook, Instagram, Android ; wv)), direct navigation to
+    // trust:// or intent:// can overwrite the page with "Webpage not available (ERR_UNKNOWN_URL_SCHEME)".
+    // Attempt the custom scheme safely via a hidden iframe while keeping the page & copied link visible.
+    if (wallet.isCustomScheme && isEmbeddedWebView) {
+      e.preventDefault();
+      if (wallet.customSchemeHref) {
+        triggerHiddenSchemeAttempt(wallet.customSchemeHref);
+      }
+      setModalNotice(
+        `Trying to open ${wallet.name}... Link copied! If it does not switch automatically, open ${wallet.name} → Browser and paste: ${launchUrl}`
       );
       return;
     }
 
     if (wallet.id === 'binance') {
       setModalNotice(
-        'DApp URL copied! Opening Binance App — go to Wallets → Web3 → Discover and paste the URL.'
+        `Opening Binance App... Backup link copied (${launchUrl}) — if needed, go to Wallets → Web3 → Discover and paste it.`
       );
       return;
     }
     if (wallet.id === 'trust') {
       setModalNotice(
-        'Opening Trust Wallet... Link copied as backup — if your browser does not switch automatically, open Trust Wallet → Browser and paste the link.'
+        `Opening Trust Wallet... Backup link copied (${launchUrl}) — if it does not switch automatically, open Trust Wallet → Browser and paste it.`
+      );
+      return;
+    }
+    if (wallet.id === 'safepal') {
+      setModalNotice(
+        `Opening SafePal Wallet... Backup link copied (${launchUrl}) — if it does not switch automatically, open SafePal → DApps Browser and paste it.`
       );
       return;
     }
     setModalNotice(
-      `Opening ${wallet.name}... Backup link copied in case your browser asks you to paste it in the wallet Browser.`
+      `Opening ${wallet.name}... Backup link copied (${launchUrl}) in case your wallet asks you to paste it in its Browser.`
     );
   }
 
@@ -631,19 +722,24 @@ export default function App() {
   const wrongNetwork = Boolean(walletAddress) && chainId !== null && chainId !== BSC_CHAIN_ID;
   const launchUrl = resolveDappUrl();
   const launchHostPath = launchUrl.replace(/^https?:\/\//i, '');
-  const { isAndroid } = getMobileEnvironment();
-  const trustDeepLink = isAndroid
+  const { isAndroid, isAndroidFirefox, isInIframe } = getMobileEnvironment();
+  const useAndroidIntent = isAndroid && !isAndroidFirefox;
+  const trustSchemeUrl = `trust://open_url?coin_id=20000714&url=${encodeURIComponent(launchUrl)}`;
+  const trustDeepLink = useAndroidIntent
     ? `intent://open_url?coin_id=20000714&url=${encodeURIComponent(
         launchUrl
-      )}#Intent;scheme=trust;package=com.wallet.crypto.trustapp;S.browser_fallback_url=${encodeURIComponent(
+      )}#Intent;scheme=trust;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.wallet.crypto.trustapp;end`
+    : trustSchemeUrl;
+  const binanceSchemeUrl = 'bnc://app.binance.com/web3';
+  const binanceDeepLink = useAndroidIntent
+    ? 'intent://app.binance.com/web3#Intent;scheme=bnc;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.binance.dev;end'
+    : binanceSchemeUrl;
+  const safePalSchemeUrl = `safepalwallet://open_url?url=${encodeURIComponent(launchUrl)}`;
+  const safePalDeepLink = useAndroidIntent
+    ? `intent://open_url?url=${encodeURIComponent(
         launchUrl
-      )};end`
-    : `trust://open_url?coin_id=20000714&url=${encodeURIComponent(launchUrl)}`;
-  const binanceDeepLink = isAndroid
-    ? `intent://app.binance.com/web3#Intent;scheme=bnc;package=com.binance.dev;S.browser_fallback_url=${encodeURIComponent(
-        launchUrl
-      )};end`
-    : 'bnc://app.binance.com/web3';
+      )}#Intent;scheme=safepalwallet;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=io.safepal.wallet;end`
+    : safePalSchemeUrl;
   const mobileWalletLinks = launchUrl
     ? [
         {
@@ -652,6 +748,7 @@ export default function App() {
           icon: '/assets/wallets/trustwallet.png',
           iconBg: 'bg-white',
           isCustomScheme: true,
+          customSchemeHref: trustSchemeUrl,
           href: trustDeepLink,
         },
         {
@@ -668,6 +765,7 @@ export default function App() {
           icon: '/assets/wallets/binance.png',
           iconBg: 'bg-[#0B1222]',
           isCustomScheme: true,
+          customSchemeHref: binanceSchemeUrl,
           href: binanceDeepLink,
         },
         {
@@ -693,8 +791,9 @@ export default function App() {
           name: 'SafePal Wallet',
           icon: '/assets/wallets/safepal.png',
           iconBg: 'bg-white',
-          isCustomScheme: false,
-          href: `https://link.safepal.io/open_url?url=${encodeURIComponent(launchUrl)}`,
+          isCustomScheme: true,
+          customSchemeHref: safePalSchemeUrl,
+          href: safePalDeepLink,
         },
         {
           id: 'bitget',
@@ -1293,6 +1392,18 @@ export default function App() {
                     </div>
                   ) : (
                     <div className="space-y-3.5">
+                      {modalNotice && (
+                        <div
+                          className={`border px-3 py-2 text-[11px] leading-relaxed break-words ${
+                            isGreenMode
+                              ? 'border-emerald-400/55 bg-emerald-950/55 text-emerald-100'
+                              : 'border-sky-400/55 bg-sky-950/55 text-cyan-100'
+                          }`}
+                        >
+                          {modalNotice}
+                        </div>
+                      )}
+
                       {wallets.length > 0 && (
                         <div className="space-y-2">
                           <div className="font-mono text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
@@ -1348,48 +1459,42 @@ export default function App() {
                         </div>
                         {wallets.length === 0 && (
                           <p className="text-xs leading-relaxed text-slate-300">
-                            Choose a mobile wallet app to open this DEX directly, or connect using a desktop browser extension (MetaMask, Rabby, OKX, Binance Web3, Coinbase).
+                            Tap a wallet app below to open this DEX on your phone, or paste{' '}
+                            <span className="font-mono text-white">tamiswap-finance.vercel.app</span>{' '}
+                            inside Trust Wallet or SafePal Browser.
                           </p>
                         )}
                         <div className="grid grid-cols-2 gap-2">
-                          {mobileWalletLinks.map((wallet) => (
-                            <a
-                              key={wallet.id}
-                              href={wallet.href}
-                              target={wallet.isCustomScheme ? undefined : '_blank'}
-                              rel={wallet.isCustomScheme ? undefined : 'noopener noreferrer'}
-                              onClick={(e) => handleMobileWalletClick(e, wallet)}
-                              className="combat-steel-btn flex items-center justify-between gap-1.5 px-2.5 py-2.5 text-xs font-semibold text-slate-100"
-                            >
-                              <span className="flex min-w-0 items-center gap-2">
-                                <img
-                                  src={wallet.icon}
-                                  alt={wallet.name}
-                                  width={22}
-                                  height={22}
-                                  className={`h-5.5 w-5.5 shrink-0 rounded-md object-contain p-0.5 ${wallet.iconBg}`}
+                          {mobileWalletLinks.map((wallet) => {
+                            const openInNewTab = isInIframe || !wallet.isCustomScheme;
+                            return (
+                              <a
+                                key={wallet.id}
+                                href={wallet.href}
+                                target={openInNewTab ? '_blank' : undefined}
+                                rel={openInNewTab ? 'noopener noreferrer' : undefined}
+                                onClick={(e) => handleMobileWalletClick(e, wallet)}
+                                className="combat-steel-btn flex items-center justify-between gap-1.5 px-2.5 py-2.5 text-xs font-semibold text-slate-100"
+                              >
+                                <span className="flex min-w-0 items-center gap-2">
+                                  <img
+                                    src={wallet.icon}
+                                    alt={wallet.name}
+                                    width={22}
+                                    height={22}
+                                    className={`h-5.5 w-5.5 shrink-0 rounded-md object-contain p-0.5 ${wallet.iconBg}`}
+                                  />
+                                  <span className="truncate">{wallet.name}</span>
+                                </span>
+                                <ExternalLink
+                                  className={`h-3 w-3 shrink-0 opacity-80 ${
+                                    isGreenMode ? 'text-emerald-300' : 'text-cyan-300'
+                                  }`}
                                 />
-                                <span className="truncate">{wallet.name}</span>
-                              </span>
-                              <ExternalLink
-                                className={`h-3 w-3 shrink-0 opacity-80 ${
-                                  isGreenMode ? 'text-emerald-300' : 'text-cyan-300'
-                                }`}
-                              />
-                            </a>
-                          ))}
+                              </a>
+                            );
+                          })}
                         </div>
-                        {modalNotice && (
-                          <div
-                            className={`border px-3 py-2 text-[11px] leading-relaxed ${
-                              isGreenMode
-                                ? 'border-emerald-400/45 bg-emerald-950/40 text-emerald-100'
-                                : 'border-sky-400/45 bg-sky-950/40 text-cyan-100'
-                            }`}
-                          >
-                            {modalNotice}
-                          </div>
-                        )}
                       </div>
 
                       <button

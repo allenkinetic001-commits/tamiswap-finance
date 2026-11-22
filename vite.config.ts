@@ -32,6 +32,18 @@ export default defineConfig(() => {
     build: {
       target: 'es2020',
       cssTarget: 'chrome90',
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined;
+            if (id.includes('node_modules/ethers')) return 'vendor-ethers';
+            if (id.includes('node_modules/motion') || id.includes('node_modules/framer-motion')) {
+              return 'vendor-motion';
+            }
+            return undefined;
+          },
+        },
+      },
     },
   };
 });
