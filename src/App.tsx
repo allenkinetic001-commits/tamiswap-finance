@@ -144,7 +144,7 @@ function inferProviderName(p: InjectedProvider): string {
   if (p.isSafePal || isSafePalUserAgent()) return 'SafePal Wallet';
   if (p.isBitKeep || p.isBitgetWallet) return 'Bitget Wallet';
   if (p.isBinance || p.isBinanceWeb3Wallet) return 'Binance Web3 Wallet';
-  if (p.isCoinWallet || p.isCoinSpace || isCoinWalletUserAgent()) return 'Coin Wallet';
+  if (p.isCoinWallet || p.isCoinSpace || isCoinWalletUserAgent()) return 'Taminator';
   if (p.isPhantom) return 'Phantom';
   if (p.isMetaMask) return 'MetaMask';
   if (isTrustUserAgent()) return 'Trust Wallet';
@@ -160,6 +160,7 @@ function normalizeWalletKey(name: string, rdns?: string): string {
   if (combined.includes('okx') || combined.includes('okex')) return 'okx-wallet';
   if (combined.includes('coinbase')) return 'coinbase-wallet';
   if (
+    combined.includes('taminator') ||
     combined.includes('coinwallet') ||
     combined.includes('coin wallet') ||
     combined.includes('coinspace') ||
@@ -181,12 +182,13 @@ function getWalletIconMeta(name: string): { src: string; bgClass: string } | nul
   if (n.includes('okx')) return { src: '/assets/wallets/okx.png', bgClass: 'bg-black' };
   if (n.includes('coinbase')) return { src: '/assets/wallets/coinbase.png', bgClass: 'bg-white' };
   if (
+    n.includes('taminator') ||
     n.includes('coinwallet') ||
     n.includes('coin wallet') ||
     n.includes('coinspace') ||
     n.includes('coinsdo')
   ) {
-    return { src: '/assets/wallets/coinwallet.png', bgClass: 'bg-[#2C3832]' };
+    return { src: '/assets/aistudio/tamiswap_00325eac.png', bgClass: 'bg-[#041024]' };
   }
   if (n.includes('safepal')) return { src: '/assets/wallets/safepal.png', bgClass: 'bg-white' };
   if (n.includes('bitget') || n.includes('bitkeep'))
@@ -292,19 +294,19 @@ export default function App() {
       addCandidate('com.bitget.web3', 'Bitget Wallet', win.bitkeep.ethereum);
     }
     if (win.coinwallet?.ethereum) {
-      addCandidate('com.coinspace.app', 'Coin Wallet', win.coinwallet.ethereum);
+      addCandidate('com.coinspace.app', 'Taminator', win.coinwallet.ethereum);
     } else if (win.coinwallet && typeof win.coinwallet.request === 'function') {
-      addCandidate('com.coinspace.app', 'Coin Wallet', win.coinwallet);
+      addCandidate('com.coinspace.app', 'Taminator', win.coinwallet);
     }
     if (win.coinspace?.ethereum) {
-      addCandidate('com.coinspace.app', 'Coin Wallet', win.coinspace.ethereum);
+      addCandidate('com.coinspace.app', 'Taminator', win.coinspace.ethereum);
     } else if (win.coinspace && typeof win.coinspace.request === 'function') {
-      addCandidate('com.coinspace.app', 'Coin Wallet', win.coinspace);
+      addCandidate('com.coinspace.app', 'Taminator', win.coinspace);
     }
     if (win.coinsdo?.ethereum) {
-      addCandidate('com.coinsdo.wallet', 'Coin Wallet', win.coinsdo.ethereum);
+      addCandidate('com.coinsdo.wallet', 'Taminator', win.coinsdo.ethereum);
     } else if (win.coinsdo && typeof win.coinsdo.request === 'function') {
-      addCandidate('com.coinsdo.wallet', 'Coin Wallet', win.coinsdo);
+      addCandidate('com.coinsdo.wallet', 'Taminator', win.coinsdo);
     }
     if (win.phantom?.ethereum) {
       addCandidate('app.phantom', 'Phantom', win.phantom.ethereum);
@@ -612,6 +614,7 @@ export default function App() {
       const coinEntry = latest.find(
         (w) =>
           w.id === 'coin-wallet' ||
+          w.name.toLowerCase().includes('taminator') ||
           w.name.toLowerCase().includes('coinwallet') ||
           w.name.toLowerCase().includes('coin wallet') ||
           w.name.toLowerCase().includes('coinspace')
@@ -683,6 +686,7 @@ export default function App() {
       if (wallet.id === 'coinbase') return n.includes('coinbase');
       if (wallet.id === 'coinwallet') {
         return (
+          n.includes('taminator') ||
           n.includes('coinwallet') ||
           n.includes('coin wallet') ||
           n.includes('coinspace') ||
@@ -751,7 +755,7 @@ export default function App() {
     }
     if (wallet.id === 'coinwallet') {
       setModalNotice(
-        `Opening Coin Wallet... Backup link copied (${launchUrl}) — open Coin Wallet Browser or paste it if needed.`
+        `Opening Taminator... Backup link copied (${launchUrl}) — open Taminator Browser or paste it if needed.`
       );
       return;
     }
@@ -828,12 +832,15 @@ export default function App() {
           href: trustDeepLink,
         },
         {
-          id: 'metamask',
-          name: 'MetaMask',
-          icon: '/assets/wallets/metamask.png',
-          iconBg: 'bg-white',
-          isCustomScheme: false,
-          href: `https://metamask.app.link/dapp/${launchHostPath}`,
+          id: 'coinwallet',
+          name: 'Taminator',
+          icon: isGreenMode
+            ? '/assets/aistudio/tamiswap_green.png'
+            : '/assets/aistudio/tamiswap_00325eac.png',
+          iconBg: isGreenMode ? 'bg-[#042212]' : 'bg-[#041024]',
+          isCustomScheme: true,
+          customSchemeHref: coinWalletSchemeUrl,
+          href: coinWalletDeepLink,
         },
         {
           id: 'binance',
@@ -880,13 +887,12 @@ export default function App() {
           href: `https://bkcode.vip?action=dapp&url=${encodeURIComponent(launchUrl)}`,
         },
         {
-          id: 'coinwallet',
-          name: 'Coin Wallet',
-          icon: '/assets/wallets/coinwallet.png',
-          iconBg: 'bg-[#2C3832]',
-          isCustomScheme: true,
-          customSchemeHref: coinWalletSchemeUrl,
-          href: coinWalletDeepLink,
+          id: 'metamask',
+          name: 'MetaMask',
+          icon: '/assets/wallets/metamask.png',
+          iconBg: 'bg-white',
+          isCustomScheme: false,
+          href: `https://metamask.app.link/dapp/${launchHostPath}`,
         },
       ]
     : [];
