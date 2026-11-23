@@ -43,10 +43,6 @@ function isSafePalUserAgent(): boolean {
   return /SafePal/i.test(navigator.userAgent || '');
 }
 
-function isCoinWalletUserAgent(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  return /CoinWallet|CoinSpace/i.test(navigator.userAgent || '');
-}
 
 function getMobileEnvironment(): {
   isAndroid: boolean;
@@ -116,8 +112,6 @@ interface InjectedProvider extends ethers.Eip1193Provider {
   isBitgetWallet?: boolean;
   isBinance?: boolean;
   isBinanceWeb3Wallet?: boolean;
-  isCoinWallet?: boolean;
-  isCoinSpace?: boolean;
   isPhantom?: boolean;
   providers?: InjectedProvider[];
 }
@@ -144,7 +138,6 @@ function inferProviderName(p: InjectedProvider): string {
   if (p.isSafePal || isSafePalUserAgent()) return 'SafePal Wallet';
   if (p.isBitKeep || p.isBitgetWallet) return 'Bitget Wallet';
   if (p.isBinance || p.isBinanceWeb3Wallet) return 'Binance Web3 Wallet';
-  if (p.isCoinWallet || p.isCoinSpace || isCoinWalletUserAgent()) return 'Taminator';
   if (p.isPhantom) return 'Phantom';
   if (p.isMetaMask) return 'MetaMask';
   if (isTrustUserAgent()) return 'Trust Wallet';
@@ -159,16 +152,6 @@ function normalizeWalletKey(name: string, rdns?: string): string {
   if (combined.includes('rabby')) return 'rabby-wallet';
   if (combined.includes('okx') || combined.includes('okex')) return 'okx-wallet';
   if (combined.includes('coinbase')) return 'coinbase-wallet';
-  if (
-    combined.includes('taminator') ||
-    combined.includes('coinwallet') ||
-    combined.includes('coin wallet') ||
-    combined.includes('coinspace') ||
-    combined.includes('coin.space') ||
-    combined.includes('coinsdo')
-  ) {
-    return 'coin-wallet';
-  }
   if (combined.includes('safepal')) return 'safepal-wallet';
   if (combined.includes('bitget') || combined.includes('bitkeep')) return 'bitget-wallet';
   if (combined.includes('phantom')) return 'phantom';
@@ -181,15 +164,6 @@ function getWalletIconMeta(name: string): { src: string; bgClass: string } | nul
   if (n.includes('trust')) return { src: '/assets/wallets/trustwallet.png', bgClass: 'bg-white' };
   if (n.includes('okx')) return { src: '/assets/wallets/okx.png', bgClass: 'bg-black' };
   if (n.includes('coinbase')) return { src: '/assets/wallets/coinbase.png', bgClass: 'bg-white' };
-  if (
-    n.includes('taminator') ||
-    n.includes('coinwallet') ||
-    n.includes('coin wallet') ||
-    n.includes('coinspace') ||
-    n.includes('coinsdo')
-  ) {
-    return { src: '/assets/aistudio/tamiswap_00325eac.png', bgClass: 'bg-[#041024]' };
-  }
   if (n.includes('safepal')) return { src: '/assets/wallets/safepal.png', bgClass: 'bg-white' };
   if (n.includes('bitget') || n.includes('bitkeep'))
     return { src: '/assets/wallets/bitget.png', bgClass: 'bg-[#0B1222]' };
@@ -265,9 +239,6 @@ export default function App() {
       safepal?: InjectedProvider & { ethereum?: InjectedProvider };
       binancew3w?: { ethereum?: InjectedProvider };
       bitkeep?: { ethereum?: InjectedProvider };
-      coinwallet?: InjectedProvider & { ethereum?: InjectedProvider };
-      coinspace?: InjectedProvider & { ethereum?: InjectedProvider };
-      coinsdo?: InjectedProvider & { ethereum?: InjectedProvider };
       phantom?: { ethereum?: InjectedProvider };
     };
 
@@ -292,21 +263,6 @@ export default function App() {
     }
     if (win.bitkeep?.ethereum) {
       addCandidate('com.bitget.web3', 'Bitget Wallet', win.bitkeep.ethereum);
-    }
-    if (win.coinwallet?.ethereum) {
-      addCandidate('com.coinspace.app', 'Taminator', win.coinwallet.ethereum);
-    } else if (win.coinwallet && typeof win.coinwallet.request === 'function') {
-      addCandidate('com.coinspace.app', 'Taminator', win.coinwallet);
-    }
-    if (win.coinspace?.ethereum) {
-      addCandidate('com.coinspace.app', 'Taminator', win.coinspace.ethereum);
-    } else if (win.coinspace && typeof win.coinspace.request === 'function') {
-      addCandidate('com.coinspace.app', 'Taminator', win.coinspace);
-    }
-    if (win.coinsdo?.ethereum) {
-      addCandidate('com.coinsdo.wallet', 'Taminator', win.coinsdo.ethereum);
-    } else if (win.coinsdo && typeof win.coinsdo.request === 'function') {
-      addCandidate('com.coinsdo.wallet', 'Taminator', win.coinsdo);
     }
     if (win.phantom?.ethereum) {
       addCandidate('app.phantom', 'Phantom', win.phantom.ethereum);
@@ -610,20 +566,6 @@ export default function App() {
         return;
       }
     }
-    if (!walletAddress && (isCoinWalletUserAgent() || (latest.length === 1 && latest[0].id === 'coin-wallet'))) {
-      const coinEntry = latest.find(
-        (w) =>
-          w.id === 'coin-wallet' ||
-          w.name.toLowerCase().includes('taminator') ||
-          w.name.toLowerCase().includes('coinwallet') ||
-          w.name.toLowerCase().includes('coin wallet') ||
-          w.name.toLowerCase().includes('coinspace')
-      );
-      if (coinEntry) {
-        void connectWithProvider(coinEntry.provider);
-        return;
-      }
-    }
     // On mobile, having an injected EIP-1193 provider means we are already inside a wallet's DApp browser
     if (!walletAddress && isMobileDevice && latest.length === 1) {
       void connectWithProvider(latest[0].provider);
@@ -684,15 +626,6 @@ export default function App() {
       if (wallet.id === 'binance') return n.includes('binance');
       if (wallet.id === 'okx') return n.includes('okx');
       if (wallet.id === 'coinbase') return n.includes('coinbase');
-      if (wallet.id === 'coinwallet') {
-        return (
-          n.includes('taminator') ||
-          n.includes('coinwallet') ||
-          n.includes('coin wallet') ||
-          n.includes('coinspace') ||
-          n.includes('coinsdo')
-        );
-      }
       if (wallet.id === 'safepal') return n.includes('safepal');
       if (wallet.id === 'bitget') return n.includes('bitget');
       return false;
@@ -753,12 +686,6 @@ export default function App() {
       );
       return;
     }
-    if (wallet.id === 'coinwallet') {
-      setModalNotice(
-        `Opening Taminator... Backup link copied (${launchUrl}) — open Taminator Browser or paste it if needed.`
-      );
-      return;
-    }
     setModalNotice(
       `Opening ${wallet.name}... Backup link copied (${launchUrl}) in case your wallet asks you to paste it in its Browser.`
     );
@@ -814,12 +741,6 @@ export default function App() {
         launchUrl
       )}#Intent;scheme=safepalwallet;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=io.safepal.wallet;end`
     : safePalSchemeUrl;
-  const coinWalletSchemeUrl = `coinspace://open_url?url=${encodeURIComponent(launchUrl)}`;
-  const coinWalletDeepLink = useAndroidIntent
-    ? `intent://open_url?url=${encodeURIComponent(
-        launchUrl
-      )}#Intent;scheme=coinspace;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.coinspace.app;end`
-    : coinWalletSchemeUrl;
   const mobileWalletLinks = launchUrl
     ? [
         {
@@ -832,15 +753,12 @@ export default function App() {
           href: trustDeepLink,
         },
         {
-          id: 'coinwallet',
-          name: 'Taminator',
-          icon: isGreenMode
-            ? '/assets/aistudio/tamiswap_green.png'
-            : '/assets/aistudio/tamiswap_00325eac.png',
-          iconBg: isGreenMode ? 'bg-[#042212]' : 'bg-[#041024]',
-          isCustomScheme: true,
-          customSchemeHref: coinWalletSchemeUrl,
-          href: coinWalletDeepLink,
+          id: 'metamask',
+          name: 'MetaMask',
+          icon: '/assets/wallets/metamask.png',
+          iconBg: 'bg-white',
+          isCustomScheme: false,
+          href: `https://metamask.app.link/dapp/${launchHostPath}`,
         },
         {
           id: 'binance',
@@ -885,14 +803,6 @@ export default function App() {
           iconBg: 'bg-[#0B1222]',
           isCustomScheme: false,
           href: `https://bkcode.vip?action=dapp&url=${encodeURIComponent(launchUrl)}`,
-        },
-        {
-          id: 'metamask',
-          name: 'MetaMask',
-          icon: '/assets/wallets/metamask.png',
-          iconBg: 'bg-white',
-          isCustomScheme: false,
-          href: `https://metamask.app.link/dapp/${launchHostPath}`,
         },
       ]
     : [];
