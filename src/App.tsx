@@ -4,7 +4,12 @@ import { AnimatePresence, motion } from 'motion/react';
 import { ArrowLeftRight, BarChart3, Check, Coins, Copy, ExternalLink, Wallet, X } from 'lucide-react';
 import { ExternalTokenSelection, SwapWidget } from './components/SwapWidget';
 import { BSC_CHAIN_ID } from './data/swapTokens';
-import { ensureBscNetwork, formatWalletError, parseChainId } from './utils/bscWeb3';
+import {
+  ensureBscNetwork,
+  formatWalletError,
+  parseChainId,
+  readProviderChainId,
+} from './utils/bscWeb3';
 import { TAMIYANOIA_TOKEN } from './utils/staking';
 import type { TopTokenEntry } from './utils/topTokens';
 
@@ -328,11 +333,22 @@ export default function App() {
           setActiveProvider(candidate.provider);
           setWalletAddress(ethers.getAddress(accs[0]));
           try {
-            const hex = await withTimeout(
-              candidate.provider.request({ method: 'eth_chainId' }),
+            let detectedChain = await withTimeout(
+              readProviderChainId(candidate.provider),
               2000
             );
-            setChainId(parseChainId(hex));
+            if (detectedChain !== null && detectedChain !== BSC_CHAIN_ID) {
+              try {
+                await withTimeout(ensureBscNetwork(candidate.provider), 3500);
+                detectedChain = await withTimeout(
+                  readProviderChainId(candidate.provider),
+                  1500
+                );
+              } catch {
+                // Keep wallet connected cleanly even if silent switch is deferred until swap
+              }
+            }
+            setChainId(detectedChain);
           } catch {
             // ignore chain read timeout during startup restore
           }
@@ -554,27 +570,24 @@ export default function App() {
       setActiveProvider(activeChosen);
       setWalletAddress(ethers.getAddress(accounts[0]));
 
-      // Record initial chainId immediately so it is never stuck null if BSC switch is cancelled
+      // Record initial chainId immediately, then quietly attempt switching to BSC without blocking connection
       try {
-        const initialHex = await activeChosen.request({ method: 'eth_chainId' });
-        setChainId(parseChainId(initialHex));
+        const initialChain = await readProviderChainId(activeChosen);
+        if (initialChain !== null) setChainId(initialChain);
+        if (initialChain !== BSC_CHAIN_ID) {
+          await ensureBscNetwork(activeChosen);
+        }
+        const finalChain = await readProviderChainId(activeChosen);
+        if (finalChain !== null) setChainId(finalChain);
       } catch {
-        // ignore pre-read failure
+        try {
+          const fallbackChain = await readProviderChainId(activeChosen);
+          if (fallbackChain !== null) setChainId(fallbackChain);
+        } catch {
+          // Keep connected smoothly; swap/approve will handle BSC network switch when clicked
+        }
       }
-
-      await ensureBscNetwork(activeChosen);
-
-      const finalHex = await activeChosen.request({ method: 'eth_chainId' });
-      const finalChain = parseChainId(finalHex);
-      setChainId(finalChain);
     } catch (err: unknown) {
-      try {
-        const currentHex = await activeChosen.request({ method: 'eth_chainId' });
-        const currentChain = parseChainId(currentHex);
-        if (currentChain !== null) setChainId(currentChain);
-      } catch {
-        // ignore read failure
-      }
       setWalletNotice(formatWalletError(err));
     }
   }
@@ -1227,9 +1240,7 @@ export default function App() {
             <button
               type="button"
               onClick={
-                wrongNetwork
-                  ? handleSwitchToBsc
-                  : walletAddress
+                walletAddress
                   ? () => setShowWalletModal(true)
                   : handleConnectButton
               }
@@ -1243,9 +1254,7 @@ export default function App() {
                 }`}
               />
               <span className="chrome-text">
-                {wrongNetwork
-                  ? 'Switch to BNB Chain'
-                  : walletAddress
+                {walletAddress
                   ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
                   : 'Connect BNB Wallet'}
               </span>

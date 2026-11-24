@@ -752,7 +752,6 @@ export function StakingView({
                     type="button"
                     disabled={
                       !walletAddress ||
-                      wrongNetwork ||
                       tamiState.userEarnedWei <= 0n ||
                       txPending !== null
                     }
@@ -844,14 +843,6 @@ export function StakingView({
                     }`}
                   />
                   <span>Connect BNB Wallet</span>
-                </button>
-              ) : wrongNetwork ? (
-                <button
-                  type="button"
-                  onClick={onSwitchToBsc}
-                  className="combat-energy-btn font-display relative z-10 mt-5 flex w-full items-center justify-center px-4 py-3.5 text-xs font-extrabold tracking-widest text-white uppercase drop-shadow-[0_1px_2px_rgba(2,6,23,0.9)]"
-                >
-                  Switch to BNB Smart Chain (56)
                 </button>
               ) : tamiInputWei <= 0n ? (
                 <button
@@ -1117,14 +1108,6 @@ export function StakingView({
                       >
                         <Wallet className="h-4 w-4" />
                         <span>Connect Owner Wallet</span>
-                      </button>
-                    ) : wrongNetwork ? (
-                      <button
-                        type="button"
-                        onClick={onSwitchToBsc}
-                        className="combat-energy-btn font-display flex w-full items-center justify-center px-4 py-3 text-xs font-extrabold tracking-wider text-white uppercase"
-                      >
-                        Switch to BNB Smart Chain (56)
                       </button>
                     ) : (
                       <button

@@ -411,6 +411,9 @@ export async function getBscReadProvider(): Promise<ethers.JsonRpcProvider> {
 }
 
 export function parseChainId(rawChainId: unknown): number | null {
+  if (rawChainId && typeof rawChainId === 'object' && 'result' in rawChainId) {
+    return parseChainId((rawChainId as { result?: unknown }).result);
+  }
   if (typeof rawChainId === 'number' && Number.isFinite(rawChainId)) {
     return rawChainId;
   }
@@ -423,6 +426,27 @@ export function parseChainId(rawChainId: unknown): number | null {
     return Number.isFinite(parsed) ? parsed : null;
   }
   return null;
+}
+
+export async function readProviderChainId(
+  ethereum: ethers.Eip1193Provider
+): Promise<number | null> {
+  try {
+    const raw = await ethereum.request({ method: 'eth_chainId' });
+    const parsed = parseChainId(raw);
+    if (parsed !== null) return parsed;
+  } catch {
+    // try net_version fallback
+  }
+  try {
+    const netRaw = await ethereum.request({ method: 'net_version' });
+    const parsed = parseChainId(netRaw);
+    if (parsed !== null) return parsed;
+  } catch {
+    // try direct provider properties
+  }
+  const p = ethereum as unknown as { chainId?: unknown; networkVersion?: unknown };
+  return parseChainId(p.chainId) ?? parseChainId(p.networkVersion);
 }
 
 function extractWalletErrorCode(err: unknown): number | undefined {
@@ -505,21 +529,42 @@ export function formatWalletError(err: unknown): string {
   return 'Wallet RPC error — check you have enough BNB for gas, refresh the quote, or increase Slippage in Settings.';
 }
 
-export async function ensureBscNetwork(ethereum: ethers.Eip1193Provider): Promise<void> {
-  const currentHex = await ethereum.request({ method: 'eth_chainId' });
-  if (parseChainId(currentHex) === BSC_CHAIN_ID) return;
+async function waitForBscChain(
+  ethereum: ethers.Eip1193Provider,
+  attempts = 6,
+  delayMs = 220
+): Promise<number | null> {
+  let lastChain: number | null = null;
+  for (let i = 0; i < attempts; i++) {
+    lastChain = await readProviderChainId(ethereum);
+    if (lastChain === BSC_CHAIN_ID) return lastChain;
+    if (i < attempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  return lastChain;
+}
 
+export async function ensureBscNetwork(ethereum: ethers.Eip1193Provider): Promise<void> {
+  const initialChain = await readProviderChainId(ethereum);
+  if (initialChain === BSC_CHAIN_ID) return;
+
+  let switchErr: unknown = null;
   try {
     await ethereum.request({
       method: 'wallet_switchEthereumChain',
       params: [{ chainId: BSC_CHAIN_ID_HEX }],
     });
+    const afterSwitch = await waitForBscChain(ethereum, 6, 200);
+    if (afterSwitch === BSC_CHAIN_ID) return;
   } catch (err: unknown) {
+    switchErr = err;
     if (isUserRejectedWalletError(err)) {
       throw new Error('Please approve switching your wallet to BNB Smart Chain (56).');
     }
+  }
 
-    // Many wallets wrap 4902 or throw -32603 / "Unrecognized chain" when BSC isn't added yet
+  try {
     await ethereum.request({
       method: 'wallet_addEthereumChain',
       params: [
@@ -528,28 +573,42 @@ export async function ensureBscNetwork(ethereum: ethers.Eip1193Provider): Promis
           chainName: 'BNB Smart Chain',
           nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
           rpcUrls: [
+            'https://bsc-dataseed.bnbchain.org/',
             'https://bsc-dataseed1.binance.org/',
-            'https://bsc-dataseed2.binance.org/',
             'https://bsc-rpc.publicnode.com/',
           ],
           blockExplorerUrls: ['https://bscscan.com/'],
         },
       ],
     });
+  } catch (addErr: unknown) {
+    if (isUserRejectedWalletError(addErr)) {
+      throw new Error('Please approve switching your wallet to BNB Smart Chain (56).');
+    }
+    // Many mobile wallets (e.g. Trust Wallet) reject wallet_addEthereumChain when BSC is already built in
+  }
 
-    // Some wallets require an explicit switch call after adding the chain
-    const afterAddHex = await ethereum.request({ method: 'eth_chainId' });
-    if (parseChainId(afterAddHex) !== BSC_CHAIN_ID) {
-      await ethereum.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: BSC_CHAIN_ID_HEX }],
-      });
+  try {
+    const afterAdd = await waitForBscChain(ethereum, 2, 150);
+    if (afterAdd === BSC_CHAIN_ID) return;
+    await ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: BSC_CHAIN_ID_HEX }],
+    });
+  } catch (retryErr: unknown) {
+    if (isUserRejectedWalletError(retryErr)) {
+      throw new Error('Please approve switching your wallet to BNB Smart Chain (56).');
     }
   }
 
-  const finalHex = await ethereum.request({ method: 'eth_chainId' });
-  if (parseChainId(finalHex) !== BSC_CHAIN_ID) {
-    throw new Error('Wallet is still not on BNB Smart Chain (Chain ID 56). Please switch to BNB Chain in your wallet.');
+  const finalChain = await waitForBscChain(ethereum, 5, 220);
+  if (finalChain !== BSC_CHAIN_ID) {
+    if (switchErr && isUserRejectedWalletError(switchErr)) {
+      throw new Error('Please approve switching your wallet to BNB Smart Chain (56).');
+    }
+    throw new Error(
+      'In Trust Wallet, tap the network selector at the top and choose BNB Smart Chain, then try again.'
+    );
   }
 }
 

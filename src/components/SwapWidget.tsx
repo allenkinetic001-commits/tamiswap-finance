@@ -315,10 +315,8 @@ export function SwapWidget({
 
   const insufficientBalance =
     Boolean(walletAddress) && amountInWei > 0n && amountInWei > balanceInWei;
-  const wrongNetwork = Boolean(walletAddress) && chainId !== null && chainId !== BSC_CHAIN_ID;
   const needsApproval =
     Boolean(walletAddress) &&
-    !wrongNetwork &&
     !tokenIn.isNative &&
     !(quote?.isWrapOrUnwrap) &&
     amountInWei > 0n &&
@@ -1029,14 +1027,6 @@ export function SwapWidget({
                 }`}
               />
               <span>Connect BNB Wallet</span>
-            </button>
-          ) : wrongNetwork ? (
-            <button
-              type="button"
-              onClick={onSwitchToBsc}
-              className="combat-energy-btn font-display relative z-10 mt-5 flex w-full items-center justify-center px-4 py-3.5 text-xs font-extrabold tracking-widest text-white uppercase drop-shadow-[0_1px_2px_rgba(2,6,23,0.9)]"
-            >
-              Switch to BNB Smart Chain (56)
             </button>
           ) : amountInWei <= 0n ? (
             <button
