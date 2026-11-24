@@ -47,6 +47,7 @@ function isSafePalUserAgent(): boolean {
 function getMobileEnvironment(): {
   isAndroid: boolean;
   isIOS: boolean;
+  isAndroidChrome: boolean;
   isAndroidFirefox: boolean;
   isEmbeddedWebView: boolean;
   isInIframe: boolean;
@@ -55,6 +56,7 @@ function getMobileEnvironment(): {
     return {
       isAndroid: false,
       isIOS: false,
+      isAndroidChrome: false,
       isAndroidFirefox: false,
       isEmbeddedWebView: false,
       isInIframe: false,
@@ -62,19 +64,23 @@ function getMobileEnvironment(): {
   }
   const ua = navigator.userAgent || '';
   const isAndroid = /Android/i.test(ua);
-  const isIOS = /iPhone|iPad|iPod/i.test(ua);
+  const isIOS = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const isAndroidFirefox = isAndroid && /Firefox|FxiOS/i.test(ua);
   const isEmbeddedWebView =
     /; wv\)/i.test(ua) ||
-    /\b(FBAN|FBAV|Instagram|Line|MicroMessenger|Telegram|Twitter|GSA\/)\b/i.test(ua) ||
+    /\b(FBAN|FBAV|Instagram|Line|MicroMessenger|Telegram|Twitter|GSA\/|WhatsApp|Snapchat|BytedanceWebview|TikTok|Discord|Reddit|LinkedInApp|Pinterest|Slack)\b/i.test(ua) ||
     (isIOS && !/Safari/i.test(ua));
+  const isThirdPartyAndroidBrowser =
+    /SamsungBrowser|MiuiBrowser|HuaweiBrowser|UCBrowser|HeyTapBrowser|VivoBrowser|OPR\/|Opera|EdgA|DuckDuckGo|Firefox/i.test(ua);
+  const isAndroidChrome =
+    isAndroid && !isEmbeddedWebView && !isThirdPartyAndroidBrowser && /Chrome\/\d+/i.test(ua);
   let isInIframe = false;
   try {
     isInIframe = typeof window !== 'undefined' && window.self !== window.top;
   } catch {
     isInIframe = true;
   }
-  return { isAndroid, isIOS, isAndroidFirefox, isEmbeddedWebView, isInIframe };
+  return { isAndroid, isIOS, isAndroidChrome, isAndroidFirefox, isEmbeddedWebView, isInIframe };
 }
 
 function triggerHiddenSchemeAttempt(schemeUrl: string) {
@@ -238,46 +244,71 @@ export default function App() {
       safepalProvider?: InjectedProvider;
       safepal?: InjectedProvider & { ethereum?: InjectedProvider };
       binancew3w?: { ethereum?: InjectedProvider };
+      BinanceChain?: InjectedProvider;
       bitkeep?: { ethereum?: InjectedProvider };
       phantom?: { ethereum?: InjectedProvider };
     };
 
-    if (win.binancew3w?.ethereum) {
-      addCandidate('com.binance.wallet', 'Binance Web3 Wallet', win.binancew3w.ethereum);
-    }
-    if (win.trustwallet?.ethereum) {
-      addCandidate('com.trustwallet.app', 'Trust Wallet', win.trustwallet.ethereum);
-    } else if (win.trustwallet) {
-      addCandidate('com.trustwallet.app', 'Trust Wallet', win.trustwallet);
-    }
-    if (win.okxwallet) {
-      addCandidate('com.okex.wallet', 'OKX Wallet', win.okxwallet);
-    }
-    if (win.safepalProvider) {
-      addCandidate('io.safepal', 'SafePal Wallet', win.safepalProvider);
-    }
-    if (win.safepal?.ethereum) {
-      addCandidate('io.safepal', 'SafePal Wallet', win.safepal.ethereum);
-    } else if (win.safepal && typeof win.safepal.request === 'function') {
-      addCandidate('io.safepal', 'SafePal Wallet', win.safepal);
-    }
-    if (win.bitkeep?.ethereum) {
-      addCandidate('com.bitget.web3', 'Bitget Wallet', win.bitkeep.ethereum);
-    }
-    if (win.phantom?.ethereum) {
-      addCandidate('app.phantom', 'Phantom', win.phantom.ethereum);
-    }
-    if (win.ethereum) {
-      if (Array.isArray(win.ethereum.providers) && win.ethereum.providers.length > 0) {
-        win.ethereum.providers.forEach((p, idx) => {
-          const name = inferProviderName(p);
-          addCandidate(`injected-${name.toLowerCase()}-${idx}`, name, p);
-        });
-      } else {
-        const name = inferProviderName(win.ethereum);
-        addCandidate(`injected-${name.toLowerCase()}`, name, win.ethereum);
+    const probe = (fn: () => void) => {
+      try {
+        fn();
+      } catch {
+        // Ignore strict wallet extension / mobile WebView getter restrictions
       }
-    }
+    };
+
+    probe(() => {
+      if (win.binancew3w?.ethereum) {
+        addCandidate('com.binance.wallet', 'Binance Web3 Wallet', win.binancew3w.ethereum);
+      } else if (win.BinanceChain && typeof win.BinanceChain.request === 'function') {
+        addCandidate('com.binance.wallet', 'Binance Web3 Wallet', win.BinanceChain);
+      }
+    });
+    probe(() => {
+      if (win.trustwallet?.ethereum) {
+        addCandidate('com.trustwallet.app', 'Trust Wallet', win.trustwallet.ethereum);
+      } else if (win.trustwallet) {
+        addCandidate('com.trustwallet.app', 'Trust Wallet', win.trustwallet);
+      }
+    });
+    probe(() => {
+      if (win.okxwallet) {
+        addCandidate('com.okex.wallet', 'OKX Wallet', win.okxwallet);
+      }
+    });
+    probe(() => {
+      if (win.safepalProvider) {
+        addCandidate('io.safepal', 'SafePal Wallet', win.safepalProvider);
+      }
+      if (win.safepal?.ethereum) {
+        addCandidate('io.safepal', 'SafePal Wallet', win.safepal.ethereum);
+      } else if (win.safepal && typeof win.safepal.request === 'function') {
+        addCandidate('io.safepal', 'SafePal Wallet', win.safepal);
+      }
+    });
+    probe(() => {
+      if (win.bitkeep?.ethereum) {
+        addCandidate('com.bitget.web3', 'Bitget Wallet', win.bitkeep.ethereum);
+      }
+    });
+    probe(() => {
+      if (win.phantom?.ethereum) {
+        addCandidate('app.phantom', 'Phantom', win.phantom.ethereum);
+      }
+    });
+    probe(() => {
+      if (win.ethereum) {
+        if (Array.isArray(win.ethereum.providers) && win.ethereum.providers.length > 0) {
+          win.ethereum.providers.forEach((p, idx) => {
+            const name = inferProviderName(p);
+            addCandidate(`injected-${name.toLowerCase()}-${idx}`, name, p);
+          });
+        } else {
+          const name = inferProviderName(win.ethereum);
+          addCandidate(`injected-${name.toLowerCase()}`, name, win.ethereum);
+        }
+      }
+    });
 
     const list = Array.from(map.values());
     setWallets(list);
@@ -337,13 +368,20 @@ export default function App() {
       }
     }
 
+    const onEthereumInitialized = () => {
+      window.dispatchEvent(new Event('eip6963:requestProvider'));
+      const rescan = scanInjectedWallets();
+      void trySilentRestore(rescan);
+    };
+
     window.addEventListener('eip6963:announceProvider', onAnnounce);
+    window.addEventListener('ethereum#initialized', onEthereumInitialized);
     window.dispatchEvent(new Event('eip6963:requestProvider'));
 
     const initial = scanInjectedWallets();
     void trySilentRestore(initial);
 
-    // Some mobile wallet WebViews (Trust Wallet, SafePal) inject providers shortly after load
+    // Some mobile wallet WebViews (Trust Wallet, SafePal, MetaMask) inject providers shortly after load
     const t1 = window.setTimeout(() => {
       window.dispatchEvent(new Event('eip6963:requestProvider'));
       const rescan1 = scanInjectedWallets();
@@ -369,6 +407,7 @@ export default function App() {
 
     return () => {
       window.removeEventListener('eip6963:announceProvider', onAnnounce);
+      window.removeEventListener('ethereum#initialized', onEthereumInitialized);
       window.clearTimeout(t1);
       window.clearTimeout(t2);
       window.clearTimeout(t3);
@@ -597,10 +636,31 @@ export default function App() {
 
   async function handleCopySiteUrl() {
     if (typeof window === 'undefined') return;
+    const text = resolveDappUrl();
     try {
-      await navigator.clipboard.writeText(resolveDappUrl());
-      setCopiedUrl(true);
-      setTimeout(() => setCopiedUrl(false), 2000);
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        setCopiedUrl(true);
+        setTimeout(() => setCopiedUrl(false), 2000);
+        return;
+      }
+    } catch {
+      // fall through to execCommand fallback
+    }
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      ta.remove();
+      if (ok) {
+        setCopiedUrl(true);
+        setTimeout(() => setCopiedUrl(false), 2000);
+      }
     } catch {
       // ignore clipboard restrictions
     }
@@ -616,7 +676,12 @@ export default function App() {
       isCustomScheme?: boolean;
     }
   ) {
-    const { isAndroid: mobileAndroid, isIOS: mobileIOS, isEmbeddedWebView } = getMobileEnvironment();
+    const {
+      isAndroid: mobileAndroid,
+      isIOS: mobileIOS,
+      isAndroidChrome: androidChrome,
+      isEmbeddedWebView,
+    } = getMobileEnvironment();
     const isMobileDevice = mobileAndroid || mobileIOS;
 
     const matchedInjected = wallets.find((w) => {
@@ -654,16 +719,16 @@ export default function App() {
       return;
     }
 
-    // In embedded WebViews (Google App, Telegram, Facebook, Instagram, Android ; wv)), direct navigation to
-    // trust:// or intent:// can overwrite the page with "Webpage not available (ERR_UNKNOWN_URL_SCHEME)".
-    // Attempt the custom scheme safely via a hidden iframe while keeping the page & copied link visible.
-    if (wallet.isCustomScheme && isEmbeddedWebView) {
+    // On Android embedded WebViews & non-Chrome browsers, direct navigation to intent:// or custom schemes
+    // can overwrite the page with "Webpage not available (ERR_UNKNOWN_URL_SCHEME)".
+    // On iOS, hidden iframes are blocked by WebKit, so iOS lets the native link navigate directly instead.
+    if (wallet.isCustomScheme && mobileAndroid && (isEmbeddedWebView || !androidChrome)) {
       e.preventDefault();
       if (wallet.customSchemeHref) {
         triggerHiddenSchemeAttempt(wallet.customSchemeHref);
       }
       setModalNotice(
-        `Trying to open ${wallet.name}... Link copied! If it does not switch automatically, open ${wallet.name} → Browser and paste: ${launchUrl}`
+        `Trying to open ${wallet.name}... Link copied! If it does not open, open ${wallet.name} → Browser and paste: ${launchUrl}`
       );
       return;
     }
@@ -723,23 +788,33 @@ export default function App() {
   const wrongNetwork = Boolean(walletAddress) && chainId !== null && chainId !== BSC_CHAIN_ID;
   const launchUrl = resolveDappUrl();
   const launchHostPath = launchUrl.replace(/^https?:\/\//i, '');
-  const { isAndroid, isAndroidFirefox, isInIframe } = getMobileEnvironment();
-  const useAndroidIntent = isAndroid && !isAndroidFirefox;
+  const { isAndroid, isIOS, isAndroidChrome, isInIframe } = getMobileEnvironment();
+  const isDesktopBrowser = !isAndroid && !isIOS;
+  const useAndroidIntent = isAndroid && isAndroidChrome;
   const trustSchemeUrl = `trust://open_url?coin_id=20000714&url=${encodeURIComponent(launchUrl)}`;
+  const trustPlayStoreFallback = encodeURIComponent(
+    'https://play.google.com/store/apps/details?id=com.wallet.crypto.trustapp'
+  );
   const trustDeepLink = useAndroidIntent
     ? `intent://open_url?coin_id=20000714&url=${encodeURIComponent(
         launchUrl
-      )}#Intent;scheme=trust;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.wallet.crypto.trustapp;end`
+      )}#Intent;scheme=trust;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.wallet.crypto.trustapp;S.browser_fallback_url=${trustPlayStoreFallback};end`
     : trustSchemeUrl;
   const binanceSchemeUrl = 'bnc://app.binance.com/web3';
+  const binancePlayStoreFallback = encodeURIComponent(
+    'https://play.google.com/store/apps/details?id=com.binance.dev'
+  );
   const binanceDeepLink = useAndroidIntent
-    ? 'intent://app.binance.com/web3#Intent;scheme=bnc;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.binance.dev;end'
+    ? `intent://app.binance.com/web3#Intent;scheme=bnc;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.binance.dev;S.browser_fallback_url=${binancePlayStoreFallback};end`
     : binanceSchemeUrl;
   const safePalSchemeUrl = `safepalwallet://open_url?url=${encodeURIComponent(launchUrl)}`;
+  const safePalPlayStoreFallback = encodeURIComponent(
+    'https://play.google.com/store/apps/details?id=io.safepal.wallet'
+  );
   const safePalDeepLink = useAndroidIntent
     ? `intent://open_url?url=${encodeURIComponent(
         launchUrl
-      )}#Intent;scheme=safepalwallet;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=io.safepal.wallet;end`
+      )}#Intent;scheme=safepalwallet;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=io.safepal.wallet;S.browser_fallback_url=${safePalPlayStoreFallback};end`
     : safePalSchemeUrl;
   const mobileWalletLinks = launchUrl
     ? [
@@ -1467,7 +1542,7 @@ export default function App() {
                         )}
                         <div className="grid grid-cols-2 gap-2">
                           {mobileWalletLinks.map((wallet) => {
-                            const openInNewTab = isInIframe || !wallet.isCustomScheme;
+                            const openInNewTab = isInIframe || (isDesktopBrowser && !wallet.isCustomScheme);
                             return (
                               <a
                                 key={wallet.id}

@@ -49,6 +49,33 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryS
   }
 }
 
+declare global {
+  interface Window {
+    __TAMISWAP_MOUNTED__?: boolean;
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.__TAMISWAP_MOUNTED__ = true;
+  try {
+    sessionStorage.removeItem('tamiswap_boot_retry');
+  } catch {
+    // ignore storage restrictions
+  }
+  window.addEventListener('vite:preloadError', (event) => {
+    event.preventDefault();
+    try {
+      const key = 'tamiswap_preload_retry';
+      if (!sessionStorage.getItem(key)) {
+        sessionStorage.setItem(key, '1');
+        window.location.reload();
+      }
+    } catch {
+      window.location.reload();
+    }
+  });
+}
+
 createRoot(document.getElementById('root')!).render(
   <AppErrorBoundary>
     <App />

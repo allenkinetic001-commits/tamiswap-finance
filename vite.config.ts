@@ -32,6 +32,7 @@ export default defineConfig(() => {
     build: {
       target: 'es2020',
       cssTarget: 'chrome90',
+      cssMinify: 'lightningcss',
       rollupOptions: {
         output: {
           manualChunks(id) {

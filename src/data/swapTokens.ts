@@ -28,10 +28,11 @@ export const TAMIYANOIA_STAKING_ADDRESS =
     ?.VITE_TAMIYANOIA_STAKING_ADDRESS || '').trim();
 
 export const BSC_RPC_URLS = [
+  'https://bsc-dataseed.bnbchain.org',
   'https://bsc-dataseed1.binance.org',
   'https://bsc-dataseed2.binance.org',
-  'https://bsc-dataseed3.binance.org',
   'https://bsc-rpc.publicnode.com',
+  'https://bsc.drpc.org',
 ];
 
 // Default BNB Chain token list (users can also import any BEP-20 by contract address)
