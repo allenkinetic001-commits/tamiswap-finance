@@ -719,7 +719,6 @@ export default function App() {
       const n = w.name.toLowerCase();
       if (wallet.id === 'trust') return n.includes('trust');
       if (wallet.id === 'metamask') return n.includes('metamask');
-      if (wallet.id === 'binance') return n.includes('binance');
       if (wallet.id === 'okx') return n.includes('okx');
       if (wallet.id === 'coinbase') return n.includes('coinbase');
       if (wallet.id === 'safepal') return n.includes('safepal');
@@ -763,12 +762,6 @@ export default function App() {
       return;
     }
 
-    if (wallet.id === 'binance') {
-      setModalNotice(
-        `Opening Binance App... Backup link copied (${launchUrl}) — if needed, go to Wallets → Web3 → Discover and paste it.`
-      );
-      return;
-    }
     if (wallet.id === 'trust') {
       setModalNotice(
         `Opening Trust Wallet... Backup link copied (${launchUrl}) — if it does not switch automatically, open Trust Wallet → Browser and paste it.`
@@ -825,13 +818,6 @@ export default function App() {
   const trustUniversalUrl = `https://link.trustwallet.com/open_url?coin_id=20000714&url=${encodeURIComponent(
     launchUrl
   )}`;
-  const binanceSchemeUrl = 'bnc://app.binance.com/web3';
-  const binancePlayStoreFallback = encodeURIComponent(
-    'https://play.google.com/store/apps/details?id=com.binance.dev'
-  );
-  const binanceDeepLink = useAndroidIntent
-    ? `intent://app.binance.com/web3#Intent;scheme=bnc;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.binance.dev;S.browser_fallback_url=${binancePlayStoreFallback};end`
-    : binanceSchemeUrl;
   const safePalSchemeUrl = `safepalwallet://open_url?url=${encodeURIComponent(launchUrl)}`;
   const safePalPlayStoreFallback = encodeURIComponent(
     'https://play.google.com/store/apps/details?id=io.safepal.wallet'
@@ -859,15 +845,6 @@ export default function App() {
           iconBg: 'bg-white',
           isCustomScheme: false,
           href: `https://metamask.app.link/dapp/${launchHostPath}`,
-        },
-        {
-          id: 'binance',
-          name: 'Binance Wallet',
-          icon: '/assets/wallets/binance.png',
-          iconBg: 'bg-[#0B1222]',
-          isCustomScheme: true,
-          customSchemeHref: binanceSchemeUrl,
-          href: binanceDeepLink,
         },
         {
           id: 'okx',
