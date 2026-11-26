@@ -20,7 +20,7 @@ const TopTokensView = lazy(() =>
   import('./components/TopTokensView').then((m) => ({ default: m.TopTokensView }))
 );
 
-const PUBLIC_DAPP_URL = 'https://tamiswap-finance.vercel.app';
+const PUBLIC_DAPP_URL = 'https://www.tamiswap.finance';
 
 function resolveDappUrl(): string {
   if (typeof window === 'undefined') return PUBLIC_DAPP_URL;
@@ -28,7 +28,8 @@ function resolveDappUrl(): string {
   if (!host || host === 'localhost' || host === '127.0.0.1' || host.endsWith('.run.app')) {
     return PUBLIC_DAPP_URL;
   }
-  return `${window.location.origin}${window.location.pathname}${window.location.search}`;
+  const cleanPath = window.location.pathname === '/' ? '' : window.location.pathname;
+  return `${window.location.origin}${cleanPath}`;
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -709,6 +710,7 @@ export default function App() {
     const {
       isAndroid: mobileAndroid,
       isIOS: mobileIOS,
+      isAndroidChrome: androidChrome,
       isEmbeddedWebView,
     } = getMobileEnvironment();
     const isMobileDevice = mobileAndroid || mobileIOS;
@@ -748,10 +750,9 @@ export default function App() {
       return;
     }
 
-    // On Android embedded WebViews (Telegram, WhatsApp, Instagram, Google App, ; wv)) and Firefox,
-    // direct navigation to intent:// can show "Webpage not available (ERR_UNKNOWN_URL_SCHEME)".
-    // Standard Android browsers (Chrome, Samsung Internet, Brave, Edge, Opera) handle intent:// natively.
-    if (wallet.isCustomScheme && mobileAndroid && (isEmbeddedWebView || isAndroidFirefox)) {
+    // Only Android Chrome natively resolves intent:// links; other Android browsers & WebViews
+    // use a hidden custom-scheme frame + copied URL so they never show "Webpage not available".
+    if (wallet.isCustomScheme && mobileAndroid && (isEmbeddedWebView || !androidChrome)) {
       e.preventDefault();
       if (wallet.customSchemeHref) {
         triggerHiddenSchemeAttempt(wallet.customSchemeHref);
@@ -817,23 +818,13 @@ export default function App() {
   const wrongNetwork = Boolean(walletAddress) && chainId !== null && chainId !== BSC_CHAIN_ID;
   const launchUrl = resolveDappUrl();
   const launchHostPath = launchUrl.replace(/^https?:\/\//i, '');
-  const { isAndroid, isIOS, isAndroidFirefox, isEmbeddedWebView, isInIframe } = getMobileEnvironment();
+  const { isAndroid, isIOS, isAndroidChrome, isEmbeddedWebView, isInIframe } = getMobileEnvironment();
   const isDesktopBrowser = !isAndroid && !isIOS;
-  const useAndroidIntent = isAndroid && !isEmbeddedWebView && !isAndroidFirefox;
+  const useAndroidIntent = isAndroid && isAndroidChrome;
   const trustSchemeUrl = `trust://open_url?coin_id=20000714&url=${encodeURIComponent(launchUrl)}`;
   const trustUniversalUrl = `https://link.trustwallet.com/open_url?coin_id=20000714&url=${encodeURIComponent(
     launchUrl
   )}`;
-  const trustPlayStoreFallback = encodeURIComponent(
-    'https://play.google.com/store/apps/details?id=com.wallet.crypto.trustapp'
-  );
-  const trustDeepLink = useAndroidIntent
-    ? `intent://open_url?coin_id=20000714&url=${encodeURIComponent(
-        launchUrl
-      )}#Intent;scheme=trust;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.wallet.crypto.trustapp;S.browser_fallback_url=${trustPlayStoreFallback};end`
-    : isIOS && !isEmbeddedWebView
-    ? trustUniversalUrl
-    : trustSchemeUrl;
   const binanceSchemeUrl = 'bnc://app.binance.com/web3';
   const binancePlayStoreFallback = encodeURIComponent(
     'https://play.google.com/store/apps/details?id=com.binance.dev'
@@ -857,9 +848,9 @@ export default function App() {
           name: 'Trust Wallet',
           icon: '/assets/wallets/trustwallet.png',
           iconBg: 'bg-white',
-          isCustomScheme: true,
+          isCustomScheme: false,
           customSchemeHref: trustSchemeUrl,
-          href: trustDeepLink,
+          href: trustUniversalUrl,
         },
         {
           id: 'metamask',

@@ -64,14 +64,19 @@ if (typeof window !== 'undefined') {
   }
   window.addEventListener('vite:preloadError', (event) => {
     event.preventDefault();
+    const freshUrl =
+      window.location.pathname +
+      '?v=' +
+      Date.now() +
+      (window.location.hash || '');
     try {
       const key = 'tamiswap_preload_retry';
       if (!sessionStorage.getItem(key)) {
         sessionStorage.setItem(key, '1');
-        window.location.reload();
+        window.location.replace(freshUrl);
       }
     } catch {
-      window.location.reload();
+      window.location.replace(freshUrl);
     }
   });
 }

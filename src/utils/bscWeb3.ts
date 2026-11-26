@@ -174,7 +174,7 @@ async function fetchKyberFeeQuote(params: {
         headers: { 'x-client-id': 'TamiSwap' },
       });
       if (res.status === 429 || res.status === 403) {
-        kyberCooldownUntil = Date.now() + 20_000;
+        kyberCooldownUntil = Date.now() + 12_000;
         return null;
       }
       if (!res.ok) continue;
@@ -510,7 +510,8 @@ export function formatWalletError(err: unknown): string {
     joined.includes('return amount is not enough') ||
     joined.includes('insufficient_output_amount') ||
     joined.includes('minreturn') ||
-    joined.includes('too little received')
+    joined.includes('too little received') ||
+    joined.includes('pancake: k')
   ) {
     return 'Price moved or this token has a transfer tax — raise Slippage (e.g. 3% or 5%) in Settings and try again.';
   }
@@ -1401,6 +1402,7 @@ export async function executeOnChainSwap(params: {
       t.includes('insufficient_output_amount') ||
       t.includes('too little received') ||
       t.includes('minreturn') ||
+      t.includes('pancake: k') ||
       t.includes('execution reverted') ||
       t.includes('call_exception') ||
       t.includes('route') ||
@@ -1528,14 +1530,18 @@ export async function executeOnChainSwap(params: {
         }
       }
 
-      // 2. Last-resort direct PancakeSwap V2 SupportingFeeOnTransferTokens fallback for native BNB buys when aggregators revert
+      // 2. Last-resort direct PancakeSwap V2 SupportingFeeOnTransferTokens fallback for native BNB buys when aggregators revert (e.g. ParaSwap Pancake: K on tax tokens)
       if (tokenIn.isNative && !tokenOut.isNative && quote.pancakePath.length >= 2) {
+        const pIface = new ethers.Interface(PANCAKE_ROUTER_V2_ABI);
+        const encodePancakeBuy = (minOut: bigint) =>
+          pIface.encodeFunctionData('swapExactETHForTokensSupportingFeeOnTransferTokens', [
+            minOut,
+            quote.pancakePath,
+            userAddress,
+            deadline,
+          ]);
         try {
-          const pIface = new ethers.Interface(PANCAKE_ROUTER_V2_ABI);
-          const directData = pIface.encodeFunctionData(
-            'swapExactETHForTokensSupportingFeeOnTransferTokens',
-            [amountOutMinWei, quote.pancakePath, userAddress, deadline]
-          );
+          const directData = encodePancakeBuy(amountOutMinWei);
           const gasLimit = await estimateBscGasSafe(
             readProvider,
             {
@@ -1557,7 +1563,32 @@ export async function executeOnChainSwap(params: {
             gasLimit,
           });
         } catch {
-          // fall through to formatted error
+          if (quote.amountOutWei > 0n) {
+            for (const testBps of [300, 600, 1200, 2000]) {
+              if (testBps <= slippageTolerance) continue;
+              const probeMinOut = (quote.amountOutWei * BigInt(10000 - testBps)) / 10000n;
+              try {
+                await estimateBscGasSafe(
+                  readProvider,
+                  {
+                    from: userAddress,
+                    to: PANCAKE_ROUTER_V2_ADDRESS,
+                    data: encodePancakeBuy(probeMinOut),
+                    value: amountInWei,
+                  },
+                  360_000n,
+                  900_000n
+                );
+                throw new Error(
+                  `NEED_SLIPPAGE_${testBps / 100}:This token charges a transfer tax or moved in price — tap "Use ${testBps / 100}% Slippage" or raise Slippage in Settings.`
+                );
+              } catch (probeErr: unknown) {
+                if (probeErr instanceof Error && probeErr.message.startsWith('NEED_SLIPPAGE_')) {
+                  throw probeErr;
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -1650,70 +1681,93 @@ export async function executeOnChainSwap(params: {
     const valueWei = tokenIn.isNative && !tokenOut.isNative ? amountInWei : 0n;
     const routerAddr =
       quote.dex === 'pancakeswap' ? PANCAKE_ROUTER_V2_ADDRESS : THENA_ROUTER_V2_ADDRESS;
-    let data = '';
-
-    if (quote.dex === 'pancakeswap') {
-      const pIface = new ethers.Interface(PANCAKE_ROUTER_V2_ABI);
-      if (tokenIn.isNative && !tokenOut.isNative) {
-        data = pIface.encodeFunctionData('swapExactETHForTokensSupportingFeeOnTransferTokens', [
-          amountOutMinWei,
-          quote.pancakePath,
-          userAddress,
-          deadline,
-        ]);
-      } else if (!tokenIn.isNative && tokenOut.isNative) {
-        data = pIface.encodeFunctionData('swapExactTokensForETHSupportingFeeOnTransferTokens', [
+    const encodeDirectCall = (minOut: bigint): string => {
+      if (quote.dex === 'pancakeswap') {
+        const pIface = new ethers.Interface(PANCAKE_ROUTER_V2_ABI);
+        if (tokenIn.isNative && !tokenOut.isNative) {
+          return pIface.encodeFunctionData('swapExactETHForTokensSupportingFeeOnTransferTokens', [
+            minOut,
+            quote.pancakePath,
+            userAddress,
+            deadline,
+          ]);
+        }
+        if (!tokenIn.isNative && tokenOut.isNative) {
+          return pIface.encodeFunctionData('swapExactTokensForETHSupportingFeeOnTransferTokens', [
+            amountInWei,
+            minOut,
+            quote.pancakePath,
+            userAddress,
+            deadline,
+          ]);
+        }
+        return pIface.encodeFunctionData('swapExactTokensForTokensSupportingFeeOnTransferTokens', [
           amountInWei,
-          amountOutMinWei,
-          quote.pancakePath,
-          userAddress,
-          deadline,
-        ]);
-      } else {
-        data = pIface.encodeFunctionData('swapExactTokensForTokensSupportingFeeOnTransferTokens', [
-          amountInWei,
-          amountOutMinWei,
+          minOut,
           quote.pancakePath,
           userAddress,
           deadline,
         ]);
       }
-    } else {
       const tIface = new ethers.Interface(ROUTER_V2_ABI);
       if (tokenIn.isNative && !tokenOut.isNative) {
-        data = tIface.encodeFunctionData('swapExactETHForTokens', [
-          amountOutMinWei,
-          quote.routes,
-          userAddress,
-          deadline,
-        ]);
-      } else if (!tokenIn.isNative && tokenOut.isNative) {
-        data = tIface.encodeFunctionData('swapExactTokensForETH', [
-          amountInWei,
-          amountOutMinWei,
-          quote.routes,
-          userAddress,
-          deadline,
-        ]);
-      } else {
-        data = tIface.encodeFunctionData('swapExactTokensForTokens', [
-          amountInWei,
-          amountOutMinWei,
+        return tIface.encodeFunctionData('swapExactETHForTokens', [
+          minOut,
           quote.routes,
           userAddress,
           deadline,
         ]);
       }
-    }
+      if (!tokenIn.isNative && tokenOut.isNative) {
+        return tIface.encodeFunctionData('swapExactTokensForETH', [
+          amountInWei,
+          minOut,
+          quote.routes,
+          userAddress,
+          deadline,
+        ]);
+      }
+      return tIface.encodeFunctionData('swapExactTokensForTokens', [
+        amountInWei,
+        minOut,
+        quote.routes,
+        userAddress,
+        deadline,
+      ]);
+    };
+
+    const data = encodeDirectCall(amountOutMinWei);
 
     let gasLimit: bigint;
     try {
       gasLimit = await estimateBscGasSafe(
         readProvider,
         { from: userAddress, to: routerAddr, data, value: valueWei },
-        360_000n
+        360_000n,
+        900_000n
       );
     } catch (estErr: unknown) {
+      if (isRetryableSlippageOrStaleError(estErr) && quote.amountOutWei > 0n) {
+        for (const testBps of [300, 600, 1200, 2000]) {
+          if (testBps <= slippageTolerance) continue;
+          const probeMinOut = (quote.amountOutWei * BigInt(10000 - testBps)) / 10000n;
+          try {
+            await estimateBscGasSafe(
+              readProvider,
+              { from: userAddress, to: routerAddr, data: encodeDirectCall(probeMinOut), value: valueWei },
+              360_000n,
+              900_000n
+            );
+            throw new Error(
+              `NEED_SLIPPAGE_${testBps / 100}:This token charges a transfer tax or moved in price — tap "Use ${testBps / 100}% Slippage" or raise Slippage in Settings.`
+            );
+          } catch (probeErr: unknown) {
+            if (probeErr instanceof Error && probeErr.message.startsWith('NEED_SLIPPAGE_')) {
+              throw probeErr;
+            }
+          }
+        }
+      }
       throw new Error(formatWalletError(estErr));
     }
 
