@@ -732,10 +732,10 @@ export default function App() {
       return;
     }
 
-    // On Android embedded WebViews & non-Chrome browsers, direct navigation to intent:// or custom schemes
-    // can overwrite the page with "Webpage not available (ERR_UNKNOWN_URL_SCHEME)".
-    // On iOS, hidden iframes are blocked by WebKit, so iOS lets the native link navigate directly instead.
-    if (wallet.isCustomScheme && mobileAndroid && (isEmbeddedWebView || !androidChrome)) {
+    // On Android embedded WebViews (Telegram, WhatsApp, Instagram, Google App, ; wv)) and Firefox,
+    // direct navigation to intent:// can show "Webpage not available (ERR_UNKNOWN_URL_SCHEME)".
+    // Standard Android browsers (Chrome, Samsung Internet, Brave, Edge, Opera) handle intent:// natively.
+    if (wallet.isCustomScheme && mobileAndroid && (isEmbeddedWebView || isAndroidFirefox)) {
       e.preventDefault();
       if (wallet.customSchemeHref) {
         triggerHiddenSchemeAttempt(wallet.customSchemeHref);
@@ -801,9 +801,9 @@ export default function App() {
   const wrongNetwork = Boolean(walletAddress) && chainId !== null && chainId !== BSC_CHAIN_ID;
   const launchUrl = resolveDappUrl();
   const launchHostPath = launchUrl.replace(/^https?:\/\//i, '');
-  const { isAndroid, isIOS, isAndroidChrome, isInIframe } = getMobileEnvironment();
+  const { isAndroid, isIOS, isAndroidFirefox, isEmbeddedWebView, isInIframe } = getMobileEnvironment();
   const isDesktopBrowser = !isAndroid && !isIOS;
-  const useAndroidIntent = isAndroid && isAndroidChrome;
+  const useAndroidIntent = isAndroid && !isEmbeddedWebView && !isAndroidFirefox;
   const trustSchemeUrl = `trust://open_url?coin_id=20000714&url=${encodeURIComponent(launchUrl)}`;
   const trustPlayStoreFallback = encodeURIComponent(
     'https://play.google.com/store/apps/details?id=com.wallet.crypto.trustapp'

@@ -378,9 +378,14 @@ function firstFulfilled<T>(promises: Promise<T>[]): Promise<T> {
   });
 }
 
-export async function getBscReadProvider(): Promise<ethers.JsonRpcProvider> {
-  if (cachedReadProvider) return cachedReadProvider;
-  if (pendingReadProvider) return pendingReadProvider;
+export function resetBscReadProvider(): void {
+  cachedReadProvider = null;
+}
+
+export async function getBscReadProvider(forceFresh = false): Promise<ethers.JsonRpcProvider> {
+  if (!forceFresh && cachedReadProvider) return cachedReadProvider;
+  if (!forceFresh && pendingReadProvider) return pendingReadProvider;
+  if (forceFresh) cachedReadProvider = null;
 
   pendingReadProvider = (async () => {
     try {
@@ -662,9 +667,16 @@ export async function fetchAllowance(
   ownerAddress: string,
   spenderAddress: string = THENA_ROUTER_V2_ADDRESS
 ): Promise<bigint> {
-  const provider = await getBscReadProvider();
-  const token = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
-  return (await token.allowance(ownerAddress, spenderAddress)) as bigint;
+  try {
+    const provider = await getBscReadProvider();
+    const token = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
+    return (await token.allowance(ownerAddress, spenderAddress)) as bigint;
+  } catch {
+    resetBscReadProvider();
+    const freshProvider = await getBscReadProvider(true);
+    const token = new ethers.Contract(tokenAddress, ERC20_ABI, freshProvider);
+    return (await token.allowance(ownerAddress, spenderAddress)) as bigint;
+  }
 }
 
 export async function fetchOnChainQuote(params: {
@@ -1151,11 +1163,12 @@ export async function sendWalletTransaction(params: {
       throw new Error('Transaction cancelled in wallet.');
     }
     const msg = collectErrorMessages(err).join(' ').toLowerCase();
-    // Some strict EIP-1559 wallet wrappers reject explicit legacy gasPrice — retry without gasPrice
+    // Some mobile wallets / EIP-1559 wrappers reject explicit gasPrice or gas — retry with wallet-managed gas
     if (
       msg.includes('gasprice') ||
       msg.includes('maxfeepergas') ||
       msg.includes('eip-1559') ||
+      msg.includes('gas') ||
       msg.includes('invalid')
     ) {
       try {
@@ -1164,7 +1177,23 @@ export async function sendWalletTransaction(params: {
           params: [baseTx],
         });
       } catch (retryErr: unknown) {
-        throw new Error(formatWalletError(retryErr));
+        if (isUserRejectedWalletError(retryErr)) {
+          throw new Error('Transaction cancelled in wallet.');
+        }
+        const minimalTx: Record<string, string> = {
+          from,
+          data,
+          value: ethers.toQuantity(valueWei),
+        };
+        if (to) minimalTx.to = ethers.getAddress(to);
+        try {
+          rawHash = await ethereum.request({
+            method: 'eth_sendTransaction',
+            params: [minimalTx],
+          });
+        } catch (finalErr: unknown) {
+          throw new Error(formatWalletError(finalErr));
+        }
       }
     } else {
       throw new Error(formatWalletError(err));
@@ -1182,7 +1211,23 @@ export async function sendWalletTransaction(params: {
 
   return {
     hash: txHash,
-    wait: async () => await readProvider.waitForTransaction(txHash, 1, 90_000),
+    wait: async () => {
+      try {
+        return await readProvider.waitForTransaction(txHash, 1, 60_000);
+      } catch {
+        // Rotate to fresh RPC and also ask wallet provider so confirmed txs never falsely appear failed
+        resetBscReadProvider();
+        try {
+          const fresh = await getBscReadProvider(true);
+          return await fresh.waitForTransaction(txHash, 1, 60_000);
+        } catch {
+          const receipt = (await ethereum
+            .request({ method: 'eth_getTransactionReceipt', params: [txHash] })
+            .catch(() => null)) as ethers.TransactionReceipt | null;
+          return receipt;
+        }
+      }
+    },
   };
 }
 

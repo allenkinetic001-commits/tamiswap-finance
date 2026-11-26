@@ -240,6 +240,17 @@ export function SwapWidget({
     };
   }, [tokenIn, tokenOut, amountInWei, routeMode, tokenSymbolMap, quoteNonce]);
 
+  // Keep aggregator quotes fresh every 20s so users never submit an expired route
+  useEffect(() => {
+    if (amountInWei <= 0n || tokenIn.symbol === tokenOut.symbol || txPending !== null || selectorSide !== null) {
+      return;
+    }
+    const interval = window.setInterval(() => {
+      setQuoteNonce((n) => n + 1);
+    }, 20_000);
+    return () => window.clearInterval(interval);
+  }, [amountInWei, tokenIn.symbol, tokenOut.symbol, txPending, selectorSide]);
+
   // Check ERC-20 allowance when paying with a BEP-20 token
   const refreshAllowance = useCallback(async () => {
     if (
@@ -402,7 +413,6 @@ export function SwapWidget({
       setAllowanceWei((prev) => (prev > amountInWei ? prev : amountInWei));
       setTxStatusText(`${tokenIn.symbol} approved for ${dexLabel}. Ready to swap.`);
       await refreshAllowance();
-      setQuoteNonce((n) => n + 1);
     } catch (err: unknown) {
       setTxError(formatWalletError(err));
       setTxStatusText(null);
@@ -1051,7 +1061,13 @@ export function SwapWidget({
               className="combat-energy-btn font-display relative z-10 mt-5 flex w-full cursor-not-allowed items-center justify-center gap-2 px-4 py-3.5 text-xs font-bold tracking-widest text-slate-300 uppercase"
             >
               <Loader2 className={`h-4 w-4 animate-spin ${isGreenMode ? 'text-emerald-400' : 'text-cyan-400'}`} />
-              <span>{quoting ? 'Fetching On-Chain Quote...' : 'Unavailable'}</span>
+              <span>
+                {quoting
+                  ? 'Fetching On-Chain Quote...'
+                  : checkingAllowance
+                  ? 'Checking Allowance...'
+                  : 'Unavailable'}
+              </span>
             </button>
           ) : needsApproval ? (
             <button
