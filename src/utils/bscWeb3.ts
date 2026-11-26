@@ -5,6 +5,7 @@ import {
   BSC_RPC_URLS,
   PANCAKE_PAIR_FACTORY_ADDRESS,
   PANCAKE_ROUTER_V2_ADDRESS,
+  PANCAKE_UNIVERSAL_ROUTER_ADDRESS,
   PLATFORM_FEE_BPS,
   PLATFORM_FEE_RECIPIENT,
   SwapToken,
@@ -88,10 +89,13 @@ export interface OnChainQuote {
   feeBps: number;
   platformFeeBps: number;
   platformFeeWei: bigint;
+  platformFeeSymbol?: string;
+  platformFeeDecimals?: number;
   platformFeeRecipient: string;
   pairAddress: string | null;
   isWrapOrUnwrap: boolean;
   useFeeWrapper?: boolean;
+  useUniversalFeeRouter?: boolean;
   directRouter?: boolean;
   kyberRouteSummary?: KyberRouteSummary;
   paraSwapPriceRoute?: ParaSwapPriceRoute;
@@ -141,21 +145,34 @@ async function fetchKyberFeeQuote(params: {
   tokenOut: SwapToken;
   amountInWei: bigint;
   mode: 'auto' | 'volatile' | 'stable';
-}): Promise<{ routeSummary: KyberRouteSummary; routerAddress: string } | null> {
-  if (Date.now() < kyberCooldownUntil) return null;
+  forceRetryOn429?: boolean;
+}): Promise<{
+  routeSummary: KyberRouteSummary;
+  routerAddress: string;
+  chargeFeeBy: 'currency_in' | 'currency_out';
+} | null> {
+  const { tokenIn, tokenOut, amountInWei, mode, forceRetryOn429 } = params;
+  const now = Date.now();
+  if (now < kyberCooldownUntil) {
+    if (!forceRetryOn429) return null;
+    const waitMs = Math.min(2500, kyberCooldownUntil - now);
+    if (waitMs > 0) {
+      await new Promise((r) => setTimeout(r, waitMs));
+    }
+  }
 
-  const { tokenIn, tokenOut, amountInWei, mode } = params;
   const inAddr = tokenIn.isNative ? KYBER_NATIVE_TOKEN : tokenIn.address;
   const outAddr = tokenOut.isNative ? KYBER_NATIVE_TOKEN : tokenOut.address;
+  // Collect treasury cut in native BNB whenever BNB is on either side of the swap
+  const chargeFeeBy: 'currency_in' | 'currency_out' =
+    tokenOut.isNative && !tokenIn.isNative ? 'currency_out' : 'currency_in';
 
-  const sourceList =
-    mode === 'volatile'
-      ? ['pancake,thena', '']
-      : mode === 'stable'
-      ? ['thena,thena-fusion,pancake-v3,pancake', '']
-      : [''];
+  // Single request per quote minimizes rate limits (429) on public endpoints
+  const sources =
+    mode === 'stable' ? 'thena,thena-fusion,pancake-v3,pancake' : '';
 
-  for (const sources of sourceList) {
+  const maxAttempts = forceRetryOn429 ? 2 : 1;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       const qs = new URLSearchParams({
         tokenIn: inAddr,
@@ -163,7 +180,7 @@ async function fetchKyberFeeQuote(params: {
         amountIn: amountInWei.toString(),
         feeAmount: String(PLATFORM_FEE_BPS),
         isInBps: 'true',
-        chargeFeeBy: 'currency_in',
+        chargeFeeBy,
         feeReceiver: PLATFORM_FEE_RECIPIENT,
       });
       if (sources) {
@@ -174,10 +191,14 @@ async function fetchKyberFeeQuote(params: {
         headers: { 'x-client-id': 'TamiSwap' },
       });
       if (res.status === 429 || res.status === 403) {
-        kyberCooldownUntil = Date.now() + 12_000;
+        kyberCooldownUntil = Date.now() + 2_500;
+        if (attempt + 1 < maxAttempts) {
+          await new Promise((r) => setTimeout(r, 1_200));
+          continue;
+        }
         return null;
       }
-      if (!res.ok) continue;
+      if (!res.ok) return null;
 
       const json = (await res.json()) as KyberRoutesResponse;
       if (
@@ -189,10 +210,12 @@ async function fetchKyberFeeQuote(params: {
         return {
           routeSummary: json.data.routeSummary,
           routerAddress: ethers.getAddress(json.data.routerAddress),
+          chargeFeeBy,
         };
       }
+      return null;
     } catch {
-      // try next source filter or fallback aggregator
+      if (attempt + 1 >= maxAttempts) return null;
     }
   }
 
@@ -203,7 +226,12 @@ async function fetchParaSwapFeeQuote(params: {
   tokenIn: SwapToken;
   tokenOut: SwapToken;
   amountInWei: bigint;
-}): Promise<{ priceRoute: ParaSwapPriceRoute; routerAddress: string; netOutWei: bigint } | null> {
+}): Promise<{
+  priceRoute: ParaSwapPriceRoute;
+  routerAddress: string;
+  netOutWei: bigint;
+  feeOutWei: bigint;
+} | null> {
   const { tokenIn, tokenOut, amountInWei } = params;
   const srcToken = tokenIn.isNative ? KYBER_NATIVE_TOKEN : tokenIn.address;
   const destToken = tokenOut.isNative ? KYBER_NATIVE_TOKEN : tokenOut.address;
@@ -230,6 +258,7 @@ async function fetchParaSwapFeeQuote(params: {
     if (grossOut <= 0n) return null;
 
     const netOutWei = (grossOut * BigInt(10000 - PLATFORM_FEE_BPS)) / 10000n;
+    const feeOutWei = grossOut - netOutWei;
     const spender = priceRoute.tokenTransferProxy || priceRoute.contractAddress;
     if (!spender || !ethers.isAddress(spender)) return null;
 
@@ -237,6 +266,7 @@ async function fetchParaSwapFeeQuote(params: {
       priceRoute,
       routerAddress: ethers.getAddress(spender),
       netOutWei,
+      feeOutWei,
     };
   } catch {
     return null;
@@ -349,6 +379,45 @@ const TAMI_FEE_ROUTER_ABI = [
   'function swapExactTokensForETHOnThena(uint256 amountIn, uint256 amountOutMin, (address from, address to, bool stable)[] routes, address to, uint256 deadline)',
   'function swapExactTokensForTokensOnThena(uint256 amountIn, uint256 amountOutMin, (address from, address to, bool stable)[] routes, address to, uint256 deadline)',
 ];
+
+const PANCAKE_UNIVERSAL_ROUTER_ABI = [
+  'function execute(bytes commands, bytes[] inputs, uint256 deadline) payable',
+];
+
+function buildUniversalPancakeFeeBuyCalldata(params: {
+  amountInWei: bigint;
+  amountOutMinWei: bigint;
+  pancakePath: string[];
+  deadline: bigint;
+}): string {
+  const { amountInWei, amountOutMinWei, pancakePath, deadline } = params;
+  const feeWei = (amountInWei * BigInt(PLATFORM_FEE_BPS)) / 10000n;
+  const swapInWei = amountInWei - feeWei;
+  if (swapInWei <= 0n) {
+    throw new Error('Swap amount too small after platform fee.');
+  }
+
+  const MSG_SENDER = '0x0000000000000000000000000000000000000001';
+  const ADDRESS_THIS = '0x0000000000000000000000000000000000000002';
+  const abi = ethers.AbiCoder.defaultAbiCoder();
+
+  // Commands:
+  // 0x06 PAY_PORTION(address(0), PLATFORM_FEE_RECIPIENT, 25 bps) -> sends 0.25% native BNB to treasury
+  // 0x0b WRAP_ETH(ADDRESS_THIS, swapInWei) -> wraps remaining 99.75% BNB to WBNB inside router
+  // 0x08 V2_SWAP_EXACT_IN(MSG_SENDER, swapInWei, amountOutMinWei, path, false) -> supports tax tokens
+  const commands = '0x060b08';
+  const inputs = [
+    abi.encode(['address', 'address', 'uint256'], [ethers.ZeroAddress, PLATFORM_FEE_RECIPIENT, PLATFORM_FEE_BPS]),
+    abi.encode(['address', 'uint256'], [ADDRESS_THIS, swapInWei]),
+    abi.encode(
+      ['address', 'uint256', 'uint256', 'address[]', 'bool'],
+      [MSG_SENDER, swapInWei, amountOutMinWei, pancakePath, false]
+    ),
+  ];
+
+  const iface = new ethers.Interface(PANCAKE_UNIVERSAL_ROUTER_ABI);
+  return iface.encodeFunctionData('execute', [commands, inputs, deadline]);
+}
 
 function getConfiguredFeeWrapperAddress(): string | null {
   if (!TAMI_FEE_ROUTER_ADDRESS || !ethers.isAddress(TAMI_FEE_ROUTER_ADDRESS)) {
@@ -815,6 +884,11 @@ export async function fetchOnChainQuote(params: {
     }
   }
 
+  const validPancake = pancakeResults
+    .filter((r): r is QuoteCandidate => r !== null)
+    .sort((a, b) => (b.outWei > a.outWei ? 1 : b.outWei < a.outWei ? -1 : 0));
+  const bestPancake = validPancake[0];
+
   const valid = [...thenaResults, ...pancakeResults].filter(
     (r): r is QuoteCandidate => r !== null
   );
@@ -921,6 +995,11 @@ export async function fetchOnChainQuote(params: {
     }
     if (kyberSymbols.length === 1) kyberSymbols.push(tokenOut.symbol);
 
+    const isOutFee = kyberFeeQuote.chargeFeeBy === 'currency_out';
+    const computedFeeWei = isOutFee
+      ? (outWei * BigInt(PLATFORM_FEE_BPS)) / BigInt(10000 - PLATFORM_FEE_BPS)
+      : platformFeeWei;
+
     return {
       dex,
       dexLabel,
@@ -928,12 +1007,14 @@ export async function fetchOnChainQuote(params: {
       amountOutWei: outWei,
       amountOutFormatted: ethers.formatUnits(outWei, tokenOut.decimals),
       routes: best?.routes || [],
-      pancakePath: best?.pancakePath || [],
+      pancakePath: bestPancake?.pancakePath || best?.pancakePath || [],
       routeSymbols: kyberSymbols,
       priceImpactPct,
       feeBps,
       platformFeeBps: PLATFORM_FEE_BPS,
-      platformFeeWei,
+      platformFeeWei: computedFeeWei,
+      platformFeeSymbol: isOutFee ? tokenOut.symbol : tokenIn.symbol,
+      platformFeeDecimals: isOutFee ? tokenOut.decimals : tokenIn.decimals,
       platformFeeRecipient: PLATFORM_FEE_RECIPIENT,
       pairAddress,
       isWrapOrUnwrap: false,
@@ -976,12 +1057,14 @@ export async function fetchOnChainQuote(params: {
       amountOutWei: paraSwapQuote.netOutWei,
       amountOutFormatted: ethers.formatUnits(paraSwapQuote.netOutWei, tokenOut.decimals),
       routes: best?.routes || [],
-      pancakePath: best?.pancakePath || [],
+      pancakePath: bestPancake?.pancakePath || best?.pancakePath || [],
       routeSymbols: fallbackSymbols,
       priceImpactPct,
       feeBps,
       platformFeeBps: PLATFORM_FEE_BPS,
-      platformFeeWei,
+      platformFeeWei: paraSwapQuote.feeOutWei,
+      platformFeeSymbol: tokenOut.symbol,
+      platformFeeDecimals: tokenOut.decimals,
       platformFeeRecipient: PLATFORM_FEE_RECIPIENT,
       pairAddress,
       isWrapOrUnwrap: false,
@@ -1020,12 +1103,14 @@ export async function fetchOnChainQuote(params: {
       amountOutWei: best.outWei,
       amountOutFormatted: ethers.formatUnits(best.outWei, tokenOut.decimals),
       routes: best.routes,
-      pancakePath: best.pancakePath,
+      pancakePath: bestPancake?.pancakePath || best.pancakePath,
       routeSymbols,
       priceImpactPct,
       feeBps,
       platformFeeBps: PLATFORM_FEE_BPS,
       platformFeeWei,
+      platformFeeSymbol: tokenIn.symbol,
+      platformFeeDecimals: tokenIn.decimals,
       platformFeeRecipient: PLATFORM_FEE_RECIPIENT,
       pairAddress,
       isWrapOrUnwrap: false,
@@ -1033,7 +1118,40 @@ export async function fetchOnChainQuote(params: {
     };
   }
 
-  // Fallback for rare unindexed BEP-20 tokens when both aggregators have no route and no fee wrapper is deployed
+  // Native BNB buys without aggregators still collect 0.25% BNB atomically via PancakeSwap Universal Router
+  if (tokenIn.isNative && !tokenOut.isNative && bestPancake && bestPancake.pancakePath.length >= 2) {
+    const pancakeSymbols = [tokenIn.symbol];
+    for (let i = 1; i < bestPancake.pancakePath.length; i++) {
+      const addr = bestPancake.pancakePath[i].toLowerCase();
+      pancakeSymbols.push(
+        i === bestPancake.pancakePath.length - 1
+          ? tokenOut.symbol
+          : tokenSymbolMap[addr] || `${addr.slice(0, 6)}...`
+      );
+    }
+    return {
+      dex: 'pancakeswap',
+      dexLabel: 'PancakeSwap V2',
+      routerAddress: PANCAKE_UNIVERSAL_ROUTER_ADDRESS,
+      amountOutWei: bestPancake.outWei,
+      amountOutFormatted: ethers.formatUnits(bestPancake.outWei, tokenOut.decimals),
+      routes: [],
+      pancakePath: bestPancake.pancakePath,
+      routeSymbols: pancakeSymbols,
+      priceImpactPct,
+      feeBps: 25 * (bestPancake.pancakePath.length - 1),
+      platformFeeBps: PLATFORM_FEE_BPS,
+      platformFeeWei,
+      platformFeeSymbol: tokenIn.symbol,
+      platformFeeDecimals: tokenIn.decimals,
+      platformFeeRecipient: PLATFORM_FEE_RECIPIENT,
+      pairAddress,
+      isWrapOrUnwrap: false,
+      useUniversalFeeRouter: true,
+    };
+  }
+
+  // Fallback for rare unindexed BEP-20 sells when both aggregators have no route and no fee wrapper is deployed
   let directOutWei = best.outWei;
   try {
     if (best.dex === 'pancakeswap') {
@@ -1382,6 +1500,7 @@ export async function executeOnChainSwap(params: {
         partnerAddress: PLATFORM_FEE_RECIPIENT,
         partnerFeeBps: PLATFORM_FEE_BPS,
         takeSurplus: false,
+        isDirectFeeTransfer: true,
       }),
     });
     const txJson = (await txRes.json()) as ParaSwapTxResponse;
@@ -1450,8 +1569,14 @@ export async function executeOnChainSwap(params: {
     }
 
     if (isRetryableSlippageOrStaleError(initialErr)) {
-      // 1. Refresh live aggregator route once (KyberSwap or ParaSwap) in case quote aged during approval
-      const freshKyber = await fetchKyberFeeQuote({ tokenIn, tokenOut, amountInWei, mode: 'auto' });
+      // 1. Refresh live aggregator route once (retaining 0.25% direct treasury fee) and wait out brief 429s
+      const freshKyber = await fetchKyberFeeQuote({
+        tokenIn,
+        tokenOut,
+        amountInWei,
+        mode: 'auto',
+        forceRetryOn429: true,
+      });
       const freshPara =
         !freshKyber || freshKyber.routerAddress.toLowerCase() !== quote.routerAddress.toLowerCase()
           ? await fetchParaSwapFeeQuote({ tokenIn, tokenOut, amountInWei })
@@ -1530,23 +1655,22 @@ export async function executeOnChainSwap(params: {
         }
       }
 
-      // 2. Last-resort direct PancakeSwap V2 SupportingFeeOnTransferTokens fallback for native BNB buys when aggregators revert (e.g. ParaSwap Pancake: K on tax tokens)
+      // 2. Last-resort Universal Router V2 fallback for native BNB buys: supports tax tokens AND pays 0.25% BNB directly to treasury
       if (tokenIn.isNative && !tokenOut.isNative && quote.pancakePath.length >= 2) {
-        const pIface = new ethers.Interface(PANCAKE_ROUTER_V2_ABI);
-        const encodePancakeBuy = (minOut: bigint) =>
-          pIface.encodeFunctionData('swapExactETHForTokensSupportingFeeOnTransferTokens', [
-            minOut,
-            quote.pancakePath,
-            userAddress,
+        const encodeUniversalBuy = (minOut: bigint) =>
+          buildUniversalPancakeFeeBuyCalldata({
+            amountInWei,
+            amountOutMinWei: minOut,
+            pancakePath: quote.pancakePath,
             deadline,
-          ]);
+          });
         try {
-          const directData = encodePancakeBuy(amountOutMinWei);
+          const directData = encodeUniversalBuy(amountOutMinWei);
           const gasLimit = await estimateBscGasSafe(
             readProvider,
             {
               from: userAddress,
-              to: PANCAKE_ROUTER_V2_ADDRESS,
+              to: PANCAKE_UNIVERSAL_ROUTER_ADDRESS,
               data: directData,
               value: amountInWei,
             },
@@ -1556,7 +1680,7 @@ export async function executeOnChainSwap(params: {
           return await sendWalletTransaction({
             ethereum,
             from: userAddress,
-            to: PANCAKE_ROUTER_V2_ADDRESS,
+            to: PANCAKE_UNIVERSAL_ROUTER_ADDRESS,
             data: directData,
             valueWei: amountInWei,
             readProvider,
@@ -1572,8 +1696,8 @@ export async function executeOnChainSwap(params: {
                   readProvider,
                   {
                     from: userAddress,
-                    to: PANCAKE_ROUTER_V2_ADDRESS,
-                    data: encodePancakeBuy(probeMinOut),
+                    to: PANCAKE_UNIVERSAL_ROUTER_ADDRESS,
+                    data: encodeUniversalBuy(probeMinOut),
                     value: amountInWei,
                   },
                   360_000n,
@@ -1672,6 +1796,70 @@ export async function executeOnChainSwap(params: {
       to: feeWrapperAddress,
       data,
       valueWei,
+      readProvider,
+      gasLimit,
+    });
+  }
+
+  if (quote.useUniversalFeeRouter) {
+    const encodeUniversalBuy = (minOut: bigint) =>
+      buildUniversalPancakeFeeBuyCalldata({
+        amountInWei,
+        amountOutMinWei: minOut,
+        pancakePath: quote.pancakePath,
+        deadline,
+      });
+
+    const data = encodeUniversalBuy(amountOutMinWei);
+    let gasLimit: bigint;
+    try {
+      gasLimit = await estimateBscGasSafe(
+        readProvider,
+        {
+          from: userAddress,
+          to: PANCAKE_UNIVERSAL_ROUTER_ADDRESS,
+          data,
+          value: amountInWei,
+        },
+        360_000n,
+        900_000n
+      );
+    } catch (estErr: unknown) {
+      if (isRetryableSlippageOrStaleError(estErr) && quote.amountOutWei > 0n) {
+        for (const testBps of [300, 600, 1200, 2000]) {
+          if (testBps <= slippageTolerance) continue;
+          const probeMinOut = (quote.amountOutWei * BigInt(10000 - testBps)) / 10000n;
+          try {
+            await estimateBscGasSafe(
+              readProvider,
+              {
+                from: userAddress,
+                to: PANCAKE_UNIVERSAL_ROUTER_ADDRESS,
+                data: encodeUniversalBuy(probeMinOut),
+                value: amountInWei,
+              },
+              360_000n,
+              900_000n
+            );
+            throw new Error(
+              `NEED_SLIPPAGE_${testBps / 100}:This token charges a transfer tax or moved in price — tap "Use ${testBps / 100}% Slippage" or raise Slippage in Settings.`
+            );
+          } catch (probeErr: unknown) {
+            if (probeErr instanceof Error && probeErr.message.startsWith('NEED_SLIPPAGE_')) {
+              throw probeErr;
+            }
+          }
+        }
+      }
+      throw new Error(formatWalletError(estErr));
+    }
+
+    return await sendWalletTransaction({
+      ethereum,
+      from: userAddress,
+      to: PANCAKE_UNIVERSAL_ROUTER_ADDRESS,
+      data,
+      valueWei: amountInWei,
       readProvider,
       gasLimit,
     });

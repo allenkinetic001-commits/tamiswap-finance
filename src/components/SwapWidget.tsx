@@ -985,9 +985,12 @@ export function SwapWidget({
                   </span>
                   <span className="font-mono text-slate-300 tabular-nums">
                     {formatDisplayAmount(
-                      ethers.formatUnits(quote.platformFeeWei, tokenIn.decimals)
+                      ethers.formatUnits(
+                        quote.platformFeeWei,
+                        quote.platformFeeDecimals ?? tokenIn.decimals
+                      )
                     )}{' '}
-                    {tokenIn.symbol}
+                    {quote.platformFeeSymbol ?? tokenIn.symbol}
                   </span>
                 </div>
               )}
