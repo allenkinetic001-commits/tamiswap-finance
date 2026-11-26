@@ -173,8 +173,8 @@ async function fetchKyberFeeQuote(params: {
       const res = await fetch(`${KYBER_BSC_API}/routes?${qs.toString()}`, {
         headers: { 'x-client-id': 'TamiSwap' },
       });
-      if (res.status === 429) {
-        kyberCooldownUntil = Date.now() + 10_000;
+      if (res.status === 429 || res.status === 403) {
+        kyberCooldownUntil = Date.now() + 20_000;
         return null;
       }
       if (!res.ok) continue;
@@ -606,8 +606,8 @@ export async function ensureBscNetwork(ethereum: ethers.Eip1193Provider): Promis
     }
   }
 
-  const finalChain = await waitForBscChain(ethereum, 5, 220);
-  if (finalChain !== BSC_CHAIN_ID) {
+  const finalChain = await waitForBscChain(ethereum, 8, 250);
+  if (finalChain !== null && finalChain !== BSC_CHAIN_ID) {
     if (switchErr && isUserRejectedWalletError(switchErr)) {
       throw new Error('Please approve switching your wallet to BNB Smart Chain (56).');
     }
@@ -1095,27 +1095,46 @@ export async function getWalletSenderAddress(
 export async function estimateBscGasSafe(
   readProvider: ethers.JsonRpcProvider,
   tx: { from: string; to?: string; data: string; value: bigint },
-  fallbackGas: bigint
+  fallbackGas: bigint,
+  networkErrorFallbackGas?: bigint
 ): Promise<bigint> {
-  try {
-    const est = await readProvider.estimateGas(tx);
-    // Add 30% safety headroom so fee-on-transfer / multi-hop swaps never run out of gas
-    const buffered = (est * 130n) / 100n;
-    return buffered > fallbackGas ? buffered : fallbackGas;
-  } catch (err: unknown) {
+  const isRevertError = (err: unknown): boolean => {
     const msg = collectErrorMessages(err).join(' ').toLowerCase();
-    const isRealRevert =
+    return (
       msg.includes('revert') ||
       msg.includes('insufficient') ||
       msg.includes('return amount') ||
       msg.includes('transfer_from_failed') ||
       msg.includes('allowance') ||
       msg.includes('expired') ||
-      msg.includes('call_exception');
-    if (isRealRevert) {
+      msg.includes('call_exception')
+    );
+  };
+
+  try {
+    const est = await readProvider.estimateGas(tx);
+    // Add 30% safety headroom so fee-on-transfer / multi-hop swaps never run out of gas
+    const buffered = (est * 130n) / 100n;
+    return buffered > fallbackGas ? buffered : fallbackGas;
+  } catch (err: unknown) {
+    if (isRevertError(err)) {
       throw err;
     }
-    return fallbackGas;
+    // Retry once on a fresh BSC RPC node before falling back
+    try {
+      resetBscReadProvider();
+      const freshProvider = await getBscReadProvider(true);
+      const est = await freshProvider.estimateGas(tx);
+      const buffered = (est * 130n) / 100n;
+      return buffered > fallbackGas ? buffered : fallbackGas;
+    } catch (retryErr: unknown) {
+      if (isRevertError(retryErr)) {
+        throw retryErr;
+      }
+      return networkErrorFallbackGas && networkErrorFallbackGas > fallbackGas
+        ? networkErrorFallbackGas
+        : fallbackGas;
+    }
   }
 }
 
@@ -1385,7 +1404,12 @@ export async function executeOnChainSwap(params: {
       t.includes('execution reverted') ||
       t.includes('call_exception') ||
       t.includes('route') ||
-      t.includes('expired')
+      t.includes('expired') ||
+      t.includes('unable to build') ||
+      t.includes('slippage') ||
+      t.includes('price') ||
+      t.includes('bad request') ||
+      t.includes('timeout')
     );
   };
 
@@ -1406,7 +1430,8 @@ export async function executeOnChainSwap(params: {
           data: txPayload.data,
           value: txPayload.valueWei,
         },
-        360_000n
+        360_000n,
+        1_200_000n
       );
 
       return await sendWalletTransaction({
@@ -1424,9 +1449,7 @@ export async function executeOnChainSwap(params: {
 
     if (isRetryableSlippageOrStaleError(initialErr)) {
       // 1. Refresh live aggregator route once (KyberSwap or ParaSwap) in case quote aged during approval
-      const freshKyber = quote.kyberRouteSummary
-        ? await fetchKyberFeeQuote({ tokenIn, tokenOut, amountInWei, mode: 'auto' })
-        : null;
+      const freshKyber = await fetchKyberFeeQuote({ tokenIn, tokenOut, amountInWei, mode: 'auto' });
       const freshPara =
         !freshKyber || freshKyber.routerAddress.toLowerCase() !== quote.routerAddress.toLowerCase()
           ? await fetchParaSwapFeeQuote({ tokenIn, tokenOut, amountInWei })
@@ -1464,7 +1487,8 @@ export async function executeOnChainSwap(params: {
           const gasLimit = await estimateBscGasSafe(
             readProvider,
             { from: userAddress, to: payload.to, data: payload.data, value: payload.valueWei },
-            360_000n
+            360_000n,
+            1_200_000n
           );
           return await sendWalletTransaction({
             ethereum,
@@ -1477,7 +1501,7 @@ export async function executeOnChainSwap(params: {
           });
         } catch {
           // Check if higher slippage resolves a transfer-tax token (e.g. GTAN / WKC)
-          for (const testBps of [300, 600, 1200]) {
+          for (const testBps of [300, 600, 1200, 2000]) {
             if (testBps <= slippageTolerance) continue;
             try {
               const probePayload = await cand.build(testBps);
@@ -1489,7 +1513,8 @@ export async function executeOnChainSwap(params: {
                   data: probePayload.data,
                   value: probePayload.valueWei,
                 },
-                360_000n
+                360_000n,
+                1_200_000n
               );
               throw new Error(
                 `NEED_SLIPPAGE_${testBps / 100}:This token charges a transfer tax or moved in price — tap "Use ${testBps / 100}% Slippage" or raise Slippage in Settings.`
@@ -1500,6 +1525,39 @@ export async function executeOnChainSwap(params: {
               }
             }
           }
+        }
+      }
+
+      // 2. Last-resort direct PancakeSwap V2 SupportingFeeOnTransferTokens fallback for native BNB buys when aggregators revert
+      if (tokenIn.isNative && !tokenOut.isNative && quote.pancakePath.length >= 2) {
+        try {
+          const pIface = new ethers.Interface(PANCAKE_ROUTER_V2_ABI);
+          const directData = pIface.encodeFunctionData(
+            'swapExactETHForTokensSupportingFeeOnTransferTokens',
+            [amountOutMinWei, quote.pancakePath, userAddress, deadline]
+          );
+          const gasLimit = await estimateBscGasSafe(
+            readProvider,
+            {
+              from: userAddress,
+              to: PANCAKE_ROUTER_V2_ADDRESS,
+              data: directData,
+              value: amountInWei,
+            },
+            360_000n,
+            900_000n
+          );
+          return await sendWalletTransaction({
+            ethereum,
+            from: userAddress,
+            to: PANCAKE_ROUTER_V2_ADDRESS,
+            data: directData,
+            valueWei: amountInWei,
+            readProvider,
+            gasLimit,
+          });
+        } catch {
+          // fall through to formatted error
         }
       }
     }

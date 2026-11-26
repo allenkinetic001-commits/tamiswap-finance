@@ -199,7 +199,10 @@ export default function App() {
     useState<ExternalTokenSelection | null>(null);
 
   const discoveredMapRef = useRef<Map<string, DiscoveredWallet>>(new Map());
-  const restoredAttemptedRef = useRef(false);
+  const restoringRef = useRef(false);
+  const walletAddressRef = useRef<string | null>(null);
+  walletAddressRef.current = walletAddress;
+  const manualDisconnectRef = useRef(false);
 
   useEffect(() => {
     try {
@@ -321,42 +324,54 @@ export default function App() {
   }, []);
 
   const trySilentRestore = useCallback(async (candidates: DiscoveredWallet[]) => {
-    if (restoredAttemptedRef.current || candidates.length === 0) return;
-    restoredAttemptedRef.current = true;
-    for (const candidate of candidates) {
-      try {
-        const accs = (await withTimeout(
-          candidate.provider.request({ method: 'eth_accounts' }) as Promise<string[]>,
-          2500
-        )) as string[];
-        if (accs && accs[0] && ethers.isAddress(accs[0])) {
-          setActiveProvider(candidate.provider);
-          setWalletAddress(ethers.getAddress(accs[0]));
-          try {
-            let detectedChain = await withTimeout(
-              readProviderChainId(candidate.provider),
-              2000
-            );
-            if (detectedChain !== null && detectedChain !== BSC_CHAIN_ID) {
-              try {
-                await withTimeout(ensureBscNetwork(candidate.provider), 3500);
-                detectedChain = await withTimeout(
-                  readProviderChainId(candidate.provider),
-                  1500
-                );
-              } catch {
-                // Keep wallet connected cleanly even if silent switch is deferred until swap
+    if (
+      restoringRef.current ||
+      manualDisconnectRef.current ||
+      walletAddressRef.current ||
+      candidates.length === 0
+    ) {
+      return;
+    }
+    restoringRef.current = true;
+    try {
+      for (const candidate of candidates) {
+        try {
+          const accs = (await withTimeout(
+            candidate.provider.request({ method: 'eth_accounts' }) as Promise<string[]>,
+            2500
+          )) as string[];
+          if (accs && accs[0] && ethers.isAddress(accs[0])) {
+            manualDisconnectRef.current = false;
+            setActiveProvider(candidate.provider);
+            setWalletAddress(ethers.getAddress(accs[0]));
+            try {
+              let detectedChain = await withTimeout(
+                readProviderChainId(candidate.provider),
+                2000
+              );
+              if (detectedChain !== null && detectedChain !== BSC_CHAIN_ID) {
+                try {
+                  await withTimeout(ensureBscNetwork(candidate.provider), 3500);
+                  detectedChain = await withTimeout(
+                    readProviderChainId(candidate.provider),
+                    1500
+                  );
+                } catch {
+                  // Keep wallet connected cleanly even if silent switch is deferred until swap
+                }
               }
+              setChainId(detectedChain);
+            } catch {
+              // ignore chain read timeout during startup restore
             }
-            setChainId(detectedChain);
-          } catch {
-            // ignore chain read timeout during startup restore
+            break;
           }
-          break;
+        } catch {
+          // ignore silent restore errors
         }
-      } catch {
-        // ignore silent restore errors
       }
+    } finally {
+      restoringRef.current = false;
     }
   }, []);
 
@@ -567,6 +582,7 @@ export default function App() {
         );
       }
 
+      manualDisconnectRef.current = false;
       setActiveProvider(activeChosen);
       setWalletAddress(ethers.getAddress(accounts[0]));
 
@@ -641,6 +657,7 @@ export default function App() {
   }
 
   function handleDisconnect() {
+    manualDisconnectRef.current = true;
     setWalletAddress(null);
     setActiveProvider(null);
     setChainId(null);
@@ -692,7 +709,6 @@ export default function App() {
     const {
       isAndroid: mobileAndroid,
       isIOS: mobileIOS,
-      isAndroidChrome: androidChrome,
       isEmbeddedWebView,
     } = getMobileEnvironment();
     const isMobileDevice = mobileAndroid || mobileIOS;
@@ -805,6 +821,9 @@ export default function App() {
   const isDesktopBrowser = !isAndroid && !isIOS;
   const useAndroidIntent = isAndroid && !isEmbeddedWebView && !isAndroidFirefox;
   const trustSchemeUrl = `trust://open_url?coin_id=20000714&url=${encodeURIComponent(launchUrl)}`;
+  const trustUniversalUrl = `https://link.trustwallet.com/open_url?coin_id=20000714&url=${encodeURIComponent(
+    launchUrl
+  )}`;
   const trustPlayStoreFallback = encodeURIComponent(
     'https://play.google.com/store/apps/details?id=com.wallet.crypto.trustapp'
   );
@@ -812,6 +831,8 @@ export default function App() {
     ? `intent://open_url?coin_id=20000714&url=${encodeURIComponent(
         launchUrl
       )}#Intent;scheme=trust;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.wallet.crypto.trustapp;S.browser_fallback_url=${trustPlayStoreFallback};end`
+    : isIOS && !isEmbeddedWebView
+    ? trustUniversalUrl
     : trustSchemeUrl;
   const binanceSchemeUrl = 'bnc://app.binance.com/web3';
   const binancePlayStoreFallback = encodeURIComponent(

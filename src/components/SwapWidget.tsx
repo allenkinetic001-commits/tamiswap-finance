@@ -153,6 +153,7 @@ export function SwapWidget({
     setTokenInSymbol(targetSymbol === 'BNB' ? 'USDT' : 'BNB');
     setTxHash(null);
     setTxError(null);
+    setSuggestedSlippagePct(null);
     setTxStatusText(null);
   }, [selectedTokenRequest]);
 
@@ -240,14 +241,15 @@ export function SwapWidget({
     };
   }, [tokenIn, tokenOut, amountInWei, routeMode, tokenSymbolMap, quoteNonce]);
 
-  // Keep aggregator quotes fresh every 20s so users never submit an expired route
+  // Keep aggregator quotes fresh while active so users never submit an expired route
   useEffect(() => {
     if (amountInWei <= 0n || tokenIn.symbol === tokenOut.symbol || txPending !== null || selectorSide !== null) {
       return;
     }
     const interval = window.setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       setQuoteNonce((n) => n + 1);
-    }, 20_000);
+    }, 30_000);
     return () => window.clearInterval(interval);
   }, [amountInWei, tokenIn.symbol, tokenOut.symbol, txPending, selectorSide]);
 
@@ -1054,7 +1056,7 @@ export function SwapWidget({
             >
               Insufficient {tokenIn.symbol} balance
             </button>
-          ) : checkingAllowance || quoting || !quote ? (
+          ) : checkingAllowance || quoting ? (
             <button
               type="button"
               disabled
@@ -1062,12 +1064,20 @@ export function SwapWidget({
             >
               <Loader2 className={`h-4 w-4 animate-spin ${isGreenMode ? 'text-emerald-400' : 'text-cyan-400'}`} />
               <span>
-                {quoting
-                  ? 'Fetching On-Chain Quote...'
-                  : checkingAllowance
-                  ? 'Checking Allowance...'
-                  : 'Unavailable'}
+                {quoting ? 'Fetching On-Chain Quote...' : 'Checking Allowance...'}
               </span>
+            </button>
+          ) : !quote ? (
+            <button
+              type="button"
+              onClick={() => {
+                setQuoteError(null);
+                setQuoteNonce((n) => n + 1);
+              }}
+              className="combat-energy-btn font-display relative z-10 mt-5 flex w-full items-center justify-center gap-2 px-4 py-3.5 text-xs font-extrabold tracking-widest text-white uppercase drop-shadow-[0_1px_2px_rgba(2,6,23,0.9)]"
+            >
+              <RefreshCw className="h-4 w-4" />
+              <span>Refresh Quote</span>
             </button>
           ) : needsApproval ? (
             <button

@@ -144,7 +144,9 @@ export function StakingView({
   }, [refreshBalances]);
 
   const tamiWalletBalanceStr =
-    balances[TAMIYANOIA_ADDRESS.toLowerCase()] ?? '0';
+    balances[TAMIYANOIA_TOKEN.symbol] ??
+    balances[TAMIYANOIA_ADDRESS.toLowerCase()] ??
+    '0';
 
   const tamiWalletBalanceWei = useMemo(() => {
     try {
